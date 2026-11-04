@@ -242,10 +242,10 @@ streamlit run app/streamlit_app.py
 | Page | What it shows |
 |---|---|
 | Sidebar (every page) | β, the η values with **raw and normalised weights side by side**, mission time, time-unit label, seed |
-| Overview | Purpose, plain-language model explanation, workflow, current exact p and R |
-| Classical | Exact curves; Monte Carlo estimate with 95 % Wilson interval and a convergence plot |
-| Quantum | Simulated MLAE estimate with its **approximate** interval, circuit check, qubits, depth, CX counts, oracle-query arithmetic, timing split |
-| Comparison | Budget-matched QAE vs Monte Carlo (`compare_with_monte_carlo`); runtime shown separately; optional error-vs-oracle-queries study with a progress bar |
+| Overview | Research question, plain-language model explanation, current exact p and R, how the three estimates differ, workflow |
+| Classical Monte Carlo | Exact curves; a sampling experiment whose estimate and 95 % Wilson interval are read out beside the exact value; convergence plot |
+| Quantum amplitude estimation | Setup with oracle-query arithmetic; simulated MLAE estimate with its **approximate** interval and circuit check; diagnostics (qubits, depth, CX counts) and the timing split kept separate from the result |
+| Comparison | Budget-matched QAE vs Monte Carlo (`compare_with_monte_carlo`) as an interval figure against the exact value; query budget and simulator runtime in separate tables; optional error-vs-oracle-queries study with a progress bar |
 | Limitations | Simulator, noise, state-preparation cost, oracle assumptions, interval calibration, why runtime is not evidence of speed-up |
 
 Behaviour:
