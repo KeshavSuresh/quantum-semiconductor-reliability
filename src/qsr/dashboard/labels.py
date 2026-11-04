@@ -15,6 +15,11 @@ WORST_CELL_COVERAGE = "0.9286"
 CALIBRATED_SHOTS = 100
 CALIBRATED_MAX_GROVER_POWER = 16
 
+# --- visual semantics: one badge per kind of quantity (same hues as the figures) ---
+BADGE_REFERENCE = ":gray-badge[Reference]"
+BADGE_CLASSICAL = ":orange-badge[Classical]"
+BADGE_QUANTUM = ":blue-badge[Quantum · simulated]"
+
 # --- the five quantities that must never be confused ---
 EXACT = "Exact model probability"
 EXACT_HELP = "Computed directly from the model: p = Σᵢ wᵢ · F(t | β, ηᵢ). No sampling, no randomness."
@@ -45,7 +50,7 @@ UNCALIBRATED_WARNING = (
     "guide only."
 )
 UNCALIBRATED_PREVIEW = (
-    "⚠️ Outside the calibration study's tested settings ({reasons}): interval coverage will be unknown."
+    "Outside the calibration study's tested settings ({reasons}): interval coverage will be unknown."
 )
 MULTI_REGION_WARNING = (
     "The data are ambiguous: the likelihood supports {n} separate ranges of p. The interval shown "
