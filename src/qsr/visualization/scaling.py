@@ -77,12 +77,14 @@ def plot_error_vs_queries(rows: Sequence[Mapping[str, float]], *, theme: Theme =
         x_title="Oracle queries: A or A† applications (QAE) / samples (MC), log scale",
         y_title="RMSE over fixed seeds (log scale)",
     )
-    # Decade ticks only; four legend entries go below the plot so they never collide with the title.
+    # Decade ticks only. The four legend entries sit at the bottom of the figure container
+    # (not at a fraction below the plot area), so they never overlap the x-axis title at
+    # any figure height, e.g. Streamlit's default chart height.
     fig.update_xaxes(type="log", dtick=1)
     fig.update_yaxes(type="log", dtick=1, exponentformat="power")
     fig.update_layout(
         hovermode="closest",
-        margin=dict(r=60, t=70, b=140),
-        legend=dict(orientation="h", yanchor="top", y=-0.18, xanchor="left", x=0.0),
+        margin=dict(r=60, t=70, b=150),
+        legend=dict(orientation="h", yref="container", yanchor="bottom", y=0.02, xanchor="left", x=0.0),
     )
     return fig

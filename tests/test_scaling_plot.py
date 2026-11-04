@@ -29,6 +29,8 @@ def test_figure_structure_and_data():
     assert fig.layout.xaxis.type == "log" and fig.layout.yaxis.type == "log"
     assert "not runtime" in fig.layout.title.text
     assert {a.text for a in fig.layout.annotations} == {"QAE", "MC"}
+    # Legend anchored to the figure container, so it cannot overlap the x-axis title at any height.
+    assert fig.layout.legend.yref == "container" and fig.layout.legend.yanchor == "bottom"
 
 
 def test_zero_rmse_becomes_gap_on_log_axis():
