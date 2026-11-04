@@ -11,7 +11,7 @@ Quantum Semiconductor Reliability Explorer: time-dependent dielectric breakdown
 | 1 | Weibull model, discrete η-uncertainty model, exact reference, classical Monte Carlo, Wilson CI, tests | Done |
 | 2 | Plotly visualizations of the shared model (curves, Monte Carlo vs exact) | Done |
 | 3 | Qiskit Quantum Amplitude Estimation on the shared model ([design and results](docs/qae_design.md)) | Done |
-| 4 | Streamlit application | Planned |
+| 4 | Streamlit dashboard (see [Dashboard](#dashboard-milestone-4)) | Done |
 | 5 | CI and documentation | Planned |
 
 ## Model (Milestone 1)
@@ -46,12 +46,13 @@ pip install -r requirements-dev.txt
 ```
 
 `requirements-dev.txt` installs everything used in development
-(`-e .[dev,viz,quantum]`). To install only what you need:
+(`-e .[dev,viz,quantum,app]`; the `app` extra needs Python ≥ 3.11). To install only what you need:
 
 ```bash
 pip install -e .                    # model + Monte Carlo only
 pip install -e ".[viz]"             # + Plotly figures
-pip install -e ".[quantum]"         # + Qiskit amplitude estimation (tested with Qiskit 2.6.1)
+pip install -e ".[quantum]"         # + Qiskit amplitude estimation (tested with Qiskit 2.1.0 and 2.6.1)
+pip install -e ".[app,quantum]"     # + Streamlit dashboard (Python >= 3.11)
 ```
 
 Without Qiskit, the classical code and its tests still work, and the quantum
@@ -214,6 +215,59 @@ fig = plot_error_vs_queries(rows)                  # RMSE vs oracle calls, log-l
   Cramér–Rao bound depending on the schedule, so treat the bound as an
   asymptotic reference, not a guarantee.
 
+## Dashboard (Milestone 4)
+
+An interactive Streamlit dashboard for exploring the model and comparing the
+three ways of obtaining p. It is a thin layer over the `qsr` package, and every
+number comes from the existing scientific code.
+
+**Requirements:** Python **3.11 or newer** for the dashboard (Streamlit's
+requirement). The scientific core still supports Python 3.10.
+
+Install from the repository root, inside a virtual environment:
+
+```bash
+pip install -e ".[app,quantum]"
+```
+
+`quantum` is optional. Without it the Classical, Overview and Limitations
+pages work fully, and the Quantum and Comparison pages explain how to enable them.
+
+Run it locally (opens at http://localhost:8501):
+
+```bash
+streamlit run app/streamlit_app.py
+```
+
+| Page | What it shows |
+|---|---|
+| Sidebar (every page) | β, the η values with **raw and normalised weights side by side**, mission time, time-unit label, seed |
+| Overview | Purpose, plain-language model explanation, workflow, current exact p and R |
+| Classical | Exact curves; Monte Carlo estimate with 95 % Wilson interval and a convergence plot |
+| Quantum | Simulated MLAE estimate with its **approximate** interval, circuit check, qubits, depth, CX counts, oracle-query arithmetic, timing split |
+| Comparison | Budget-matched QAE vs Monte Carlo (`compare_with_monte_carlo`); runtime shown separately; optional error-vs-oracle-queries study with a progress bar |
+| Limitations | Simulator, noise, state-preparation cost, oracle assumptions, interval calibration, why runtime is not evidence of speed-up |
+
+Behaviour:
+- **Explicit runs:** simulations run only when you press a Run button.
+- **Stale results:** a result computed with different settings (any model
+  input, seed, sample count, shots or schedule) is marked **out of date**, with
+  the changed settings listed. A stale run is always drawn against the model
+  that produced it.
+- **Caching:** results are cached per setting. The scaling study is not
+  cached, because it draws a live progress bar.
+
+**Known issue (worked around):** with Qiskit 2.6.1, if Qiskit is first imported
+on a thread that later exits, building any circuit on another thread crashes
+the Python process. Qiskit 2.1.0 does not have this problem; versions in between
+were not tested. Streamlit runs each rerun on a new thread, so the dashboard
+runs all Qiskit work on one persistent worker thread
+(`qsr.dashboard.services._on_qiskit_thread`). If you call `qsr.quantum` from your
+own multi-threaded code, either import Qiskit on the main thread first or keep
+the importing thread alive.
+
+The dashboard is for local use and has not been deployed.
+
 ## Project layout
 
 ```
@@ -232,6 +286,13 @@ examples/milestone2_plots.py       Milestone 2 figures → build/plots/*.html
 examples/milestone3_qae.py         Milestone 3 QAE demonstration
 examples/milestone3_ci_calibration.py  CI coverage study (60,000 + 1,500 trials)
 examples/milestone3_ci_diagnostics.py  CI failure diagnostics, sampler comparison, bias study
+src/qsr/dashboard/config.py        dashboard inputs, limits, validation -> DiscreteEtaModel
+src/qsr/dashboard/services.py      run wrappers, staleness fingerprints, Qiskit worker thread
+src/qsr/dashboard/labels.py        every scientific label and caption shown in the UI
+app/streamlit_app.py               dashboard entry point (sidebar + navigation)
+app/views/                         Overview, Classical, Quantum, Comparison, Limitations pages
+app/components/                    sidebar, session state, cached runners
+.streamlit/config.toml             local Streamlit settings (no secrets)
 docs/qae_design.md                 QAE design, implementation decisions and results
 tests/                             pytest suite
 ```
