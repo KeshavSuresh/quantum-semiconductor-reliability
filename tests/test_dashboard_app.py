@@ -202,6 +202,28 @@ def test_comparison_calibration_notice_and_timing_split(shots, calibrated):
     assert labels.COMPILE_NOTE in text
 
 
+@needs_qiskit
+def test_default_settings_reproduce_the_documented_demo():
+    """docs/demo_guide.md relies on the untouched defaults giving exactly these numbers."""
+    at = _app()
+    at.switch_page("views/classical.py").run()
+    _click(at, "Run Monte Carlo")
+    assert _metric(at, labels.MC) == "0.080190"
+    at.switch_page("views/quantum.py").run()
+    _click(at, "Run QAE on the simulator")
+    r = at.session_state["quantum_run"].result
+    assert (_metric(at, labels.QAE), r.evaluation_schedule, r.shots, r.n_ci_regions) == (
+        "0.078668", (0, 1, 2, 4, 8, 16), 100, 1)
+    assert labels.QAE_CI_CAPTION in _text(at)  # calibrated settings, measured coverage quoted
+    assert not any("outside the calibration study" in w.value for w in at.warning)
+    assert not any("ambiguous" in w.value for w in at.warning)
+    at.switch_page("views/comparison.py").run()
+    _click(at, "Run matched comparison")
+    df = at.dataframe[0].value
+    assert [round(v, 6) for v in df["Value"]] == [0.079184, 0.077206, 0.078668]
+    assert list(df["Model evaluations"].iloc[1:]) == [6800, 6800]
+
+
 def test_comparison_page_matched_and_scaling():
     at = _app()
     at.switch_page("views/comparison.py").run()

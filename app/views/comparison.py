@@ -32,7 +32,8 @@ from qsr.visualization import plot_error_vs_queries  # noqa: E402
 st.subheader("1. Matched comparison")
 st.markdown(labels.MATCHED_BUDGET)
 c1, c2 = st.columns(2)
-length = c1.slider("Grover schedule length", 1, LIMITS.max_schedule_length, 5, key="cmp_len")
+# Defaults match the documented example and demo guide (m up to 16, 100 shots: calibrated settings).
+length = c1.slider("Grover schedule length", 1, LIMITS.max_schedule_length, 6, key="cmp_len")
 shots = c2.select_slider("Shots per circuit", options=SHOT_CHOICES, value=100, key="cmp_shots")
 sch = services.schedule_for(length)
 st.caption(f"Budget: {shots} × {sum(2 * m + 1 for m in sch)} = {services.oracle_calls_for(length, shots):,} "
@@ -84,8 +85,8 @@ st.subheader("2. Error versus oracle queries")
 st.markdown("Repeats both methods over several seeds and budgets, and plots the root-mean-square error against "
             "the number of oracle queries (QAE) or samples (MC). This is a **query-complexity** comparison.")
 c1, c2, c3 = st.columns(3)
-max_len = c1.slider("Largest schedule length", 2, LIMITS.max_schedule_length, 5, key="sc_len")
-n_seeds = c2.slider("Seeds per point", 3, LIMITS.max_scaling_seeds, 10, key="sc_seeds")
+max_len = c1.slider("Largest schedule length", 2, LIMITS.max_schedule_length, 6, key="sc_len")
+n_seeds = c2.slider("Seeds per point", 3, LIMITS.max_scaling_seeds, 20, key="sc_seeds")
 sc_shots = c3.select_slider("Shots per circuit", options=SHOT_CHOICES, value=100, key="sc_shots")
 st.caption(f"Seeds {inputs.seed} … {inputs.seed + n_seeds - 1}. This can take from a few seconds to about "
            "a minute; it runs only when you press the button.")

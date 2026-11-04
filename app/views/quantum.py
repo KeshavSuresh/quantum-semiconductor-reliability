@@ -43,7 +43,8 @@ with st.expander("How it works, in plain language"):
     )
 
 c1, c2 = st.columns(2)
-length = c1.slider("Grover schedule length", 1, LIMITS.max_schedule_length, 5, key="q_len",
+# Default 6 (m up to 16, 100 shots): the documented example, inside the calibration study's settings.
+length = c1.slider("Grover schedule length", 1, LIMITS.max_schedule_length, 6, key="q_len",
                    help="Number of circuits; powers m = 0, 1, 2, 4, …")
 shots = c2.select_slider("Shots per circuit", options=SHOT_CHOICES, value=100, key="q_shots")
 sch = services.schedule_for(length)  # never import qsr.quantum on a page (see services docstring)
