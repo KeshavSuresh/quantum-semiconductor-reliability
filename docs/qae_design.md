@@ -230,10 +230,17 @@ These agree with part A for the same p within sampling error.
 
 **Verdict.** The interval is an **approximate** 95 % interval. Measured
 coverage is 0.90–0.99 depending on p and schedule (0.943 pooled). It should
-not be described as having guaranteed or exact 95 % coverage.
+not be described as having guaranteed or exact 95 % coverage. The diagnostics
+in 8.6 explain where the shortfall comes from.
+
+**Reproducibility of this table.** Re-running
+`examples/milestone3_ci_calibration.py` on the current code reproduces this
+section byte for byte: all 30 cells, the pooled line and the 3 pipeline rows.
+Only the wall-clock "elapsed" lines differ (278 → 283 s and 177 → 179 s).
 
 ### 8.3 Estimator accuracy vs the Cramér–Rao bound
-In a 4,000-trial count-level check at p = 0.0792, the finite-sample MLE has
+In a 4,000-trial count-level check at p = 0.0792
+(`milestone3_ci_diagnostics.py --parts 5`), the finite-sample MLE has
 small but statistically significant bias: −3.9e-4 ± 0.3e-4 at m_max = 8, and
 +7.9e-5 ± 0.9e-5 at m_max = 16. Its RMSE is 0.99×, 1.48× and 0.83× the CRB at
 m_max = 1, 8 and 16. The CRB bounds unbiased estimators only and is reached
@@ -251,8 +258,9 @@ to 0.69× the CRB. Those results are withdrawn.
 | 32 | 13,300 | 0.00035 | 0.00036 | 0.00258 | 0.00234 | 0.509 | 0.0009 |
 
 Measured RMSE follows ~1/calls for QAE and ~1/√calls for MC, which is
-query-complexity scaling. **Wall-clock time per run is ≈ 590× higher for QAE
-than for MC** at 13,300 calls on this classical simulator. These timings are
+query-complexity scaling. **Wall-clock time per run is roughly 600× higher for
+QAE than for MC** at 13,300 calls on this classical simulator (585× and 597× in
+two runs; timings are machine-dependent). These timings are
 not hardware estimates, and **no practical quantum speed-up is shown or claimed.**
 
 ### 8.5 Single run (seed 2026, m = 0,1,2,4,8,16, N = 100)
@@ -261,4 +269,82 @@ not hardware estimates, and **no practical quantum speed-up is shown or claimed.
 - Exact: 0.079184.
 - Circuit depth 25 → 921 and CX 5 → 261 (basis rz, sx, x, cx; opt level 1;
   no topology).
-- QAE run time 0.42 s, MC run time 0.0006 s.
+- QAE run time ≈ 0.4 s (0.42 s and 0.39 s in two runs), MC run time 0.0006 s.
+
+### 8.6 Where the under-coverage comes from (`examples/milestone3_ci_diagnostics.py`)
+Fresh seeds were used (`SeedSequence(951000)` for parts 1–3 and seeds 760000+
+for part 4), disjoint from every other study. Every non-covered trial, and
+every multi-region trial in parts 1–2, was re-evaluated with an independent
+2,000,001-point brute-force likelihood.
+
+- **Grid/optimiser:** the brute-force maximum, hull endpoints (within 2 grid
+  steps) and region count were compared for **2,739 non-covered trials**. There
+  were **0 mismatches**. Numerical or optimisation error contributes nothing
+  measurable.
+- **Peak classification** used the actual likelihood. From the true θ₀, steepest
+  ascent on the brute-force log-likelihood leads to a local maximum. If that is
+  not the global maximum, the failure is a **wrong-peak** failure. Otherwise the
+  MLE sits on θ₀'s own peak, and the failure is a **χ² calibration** failure:
+  W₀ = 2[ℓ(θ̂) − ℓ(θ₀)] > χ²₁(0.95).
+
+| Cell (2,000 trials) | Covered (hull) | Wilson 95 % | Union-only covered | Multi-region | Hull gain | Hull/union width (median, max) | Wrong peak | χ² calibration |
+|---|---|---|---|---|---|---|---|---|
+| p=0.01, m_max=8 | 1852 | [0.914, 0.937] | 1852 | 309 | 0 | 1.34, 2.53 | 18 | 130 |
+| p=0.01, m_max=16 | 1822 | [0.898, 0.923] | 1813 | 442 | 9 | 1.74, 3.15 | 76 | 102 |
+| p=0.0792, m_max=0 | 1857 | [0.916, 0.939] | 1857 | 0 | 0 | — | 0 | 143 |
+| p=0.0792, m_max=2 | 1879 | [0.928, 0.949] | 1879 | 243 | 0 | 1.40, 2.25 | 24 | 97 |
+| p=0.0792, m_max=8 | 1878 | [0.928, 0.949] | 1878 | 275 | 0 | 1.37, 2.08 | 28 | 94 |
+| p=0.3, m_max=1 | 1810 | [0.891, 0.917] | 1791 | 778 | 19 | 1.51, 2.62 | 90 | 100 |
+| p=0.7, m_max=1 | 1808 | [0.890, 0.916] | 1797 | 737 | 11 | 1.47, 2.57 | 77 | 115 |
+| p=0.95, m_max=0 | 1887 | [0.933, 0.953] | 1887 | 0 | 0 | — | 0 | 113 |
+| p=0.3, m_max=8 | 1895 | [0.937, 0.956] | 1895 | 0 | 0 | — | 0 | 105 |
+
+**Worst cell at 20,000 trials** (p = 0.01, m_max = 8): **18,573 / 20,000 = 0.9286**
+(Wilson 95 % [0.925, 0.932]). Of the 1,427 failures, 268 are wrong-peak and
+1,159 are χ² calibration, with 0 brute-force mismatches out of 1,427. The
+original study's 0.916 (1,833/2,000) for this cell and the diagnostics' 0.926
+(1,852/2,000) are both consistent with ≈ 0.93. The 0.916 was the lowest of 30
+cells, so it was also biased low by being selected as the minimum.
+
+**Interpretation.** The categories overlap and are not exclusive:
+- **χ² calibration** is the largest source: 53–100 % of failures per cell, and
+  999 of 1,312 (76 %) across the nine cells.
+  It also appears in single-peak cells: m = 0 cells cover 0.929–0.944, the
+  ordinary finite-sample behaviour of a likelihood-ratio interval for a
+  binomial with N = 100.
+- **Wrong peaks** are an additional source, and only where the likelihood is
+  multimodal. There they account for 12–47 % of failures (19 % in the
+  20,000-trial worst cell). A wrong-peak trial is
+  also a χ² failure by construction: W₀ is large because θ₀ sits on a lower
+  peak.
+- **Disconnected regions** do not cause failures. Taking the **hull** can only
+  add coverage: it added 0–19 trials per cell (at most +0.95 percentage points),
+  but made multi-region intervals a median 1.34–1.74× wider, up to 3.15×. A hull
+  that spans separate regions contains values of p the data reject. It is a
+  conservative summary, and `n_ci_regions > 1` should be read as "the data are
+  ambiguous between separated values of p".
+- **Numerical or optimisation errors:** none detected.
+
+The interval method was **not** changed to force coverage.
+
+### 8.7 Effect of the sampler fix (identical seeds 760000+, model, shots; 400 trials)
+
+| m_max | Sampler | Covered | Wilson 95 % | RMSE / CRB | corr(hits m=1, hits m=4) |
+|---|---|---|---|---|---|
+| 4 | legacy (one job, integer seed) | 394 | [0.968, 0.993] | 0.79 | +0.646 |
+| 4 | current (per-circuit seeds) | 374 | [0.907, 0.955] | 1.07 | −0.054 |
+| 16 | legacy | 397 | [0.978, 0.997] | 0.62 | +0.599 |
+| 16 | current | 397 | [0.978, 0.997] | 0.85 | +0.009 |
+
+- **The fix changed the statistics, not only reproducibility.** With the legacy
+  sampler, counts were strongly positively correlated across Grover powers.
+  That made the RMSE look better than the Cramér–Rao bound (0.62–0.79×) and
+  inflated coverage. With independent counts, the RMSE returns to about the
+  bound and coverage matches the count-level study.
+- The difference is **expected from the implementation**. Each circuit now
+  draws from a different random stream, so legacy and current results differ
+  even with the same user seed. It is not a reproducibility problem: each
+  method gives byte-identical results when re-run with the same seed (checked).
+- The equal 397/400 at m_max = 16 is a coincidence of two different hit
+  matrices. The trials with m = 16 hits differ: P(anc = 1) = 1.3e-4 for that
+  circuit, so it registered a hit in only 4 legacy and 6 current trials.

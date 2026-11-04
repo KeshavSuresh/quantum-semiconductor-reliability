@@ -188,20 +188,28 @@ fig = plot_error_vs_queries(rows)                  # RMSE vs oracle calls, log-l
   Cramér–Rao bound (QAE, ~1/calls) and the binomial standard error
   (MC, ~1/√calls). The measured RMSE follows both trends.
 - **Wall-clock times are simulator times.** QAE runs on a classical
-  statevector simulator and was ≈ 590× slower per run than classical MC here
-  (≈ 0.51 s vs ≈ 0.0009 s at 13,300 calls). **No practical quantum speed-up is
-  shown or claimed.**
+  statevector simulator and was roughly 600× slower per run than classical MC
+  here (≈ 0.5 s vs ≈ 0.001 s at 13,300 calls). Timings vary between runs and
+  machines. **No practical quantum speed-up is shown or claimed.**
 - The Fᵢ are computed classically and loaded as rotation angles. Any
   advantage would apply only to estimating the weighted sum, not to computing Fᵢ.
 - Circuits are noiseless, with no hardware topology or error correction.
   Reported depths use the basis {rz, sx, x, cx} with no connectivity
   constraints, and they grow linearly with the Grover power (921 at m = 16).
   Such depths would be far beyond current noisy hardware.
-- The confidence intervals are **approximate** 95 % likelihood-ratio intervals.
-  Over 60,000 calibration trials on fresh seeds, pooled coverage was 0.943
-  (Wilson [0.941, 0.945]). Individual cells ranged from 0.900 to 0.994, with
-  under-coverage where the likelihood has several peaks. Full counts are in
-  `docs/qae_design.md` §8, produced by `python examples/milestone3_ci_calibration.py`.
+- The confidence intervals are **approximate** 95 % likelihood-ratio intervals,
+  **not** guaranteed 95 %.
+  - Over 60,000 calibration trials on fresh seeds, pooled coverage was 0.943
+    (Wilson [0.941, 0.945]). Individual cells ranged from 0.900 to 0.994.
+  - The worst cell re-run with 20,000 trials gave 0.9286 [0.925, 0.932].
+  - Most failures are χ² calibration error at 100 shots. Wrong likelihood peaks
+    add more where the likelihood is multimodal. No numerical or optimiser errors
+    were found in 2,739 brute-force checks.
+  - When `n_ci_regions > 1`, the reported interval is the hull of separate
+    regions: conservative, and wider than the set the data support.
+  - Full counts are in `docs/qae_design.md` §8, from
+    `python examples/milestone3_ci_calibration.py` and
+    `python examples/milestone3_ci_diagnostics.py`.
 - The finite-sample MLE has small measurable bias. Its RMSE was 0.83–1.48× the
   Cramér–Rao bound depending on the schedule, so treat the bound as an
   asymptotic reference, not a guarantee.
@@ -223,6 +231,7 @@ src/qsr/quantum/comparison.py      budget-matched QAE vs Monte Carlo and scaling
 examples/milestone2_plots.py       Milestone 2 figures → build/plots/*.html
 examples/milestone3_qae.py         Milestone 3 QAE demonstration
 examples/milestone3_ci_calibration.py  CI coverage study (60,000 + 1,500 trials)
+examples/milestone3_ci_diagnostics.py  CI failure diagnostics, sampler comparison, bias study
 docs/qae_design.md                 QAE design, implementation decisions and results
 tests/                             pytest suite
 ```
