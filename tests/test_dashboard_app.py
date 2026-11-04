@@ -122,7 +122,10 @@ def test_quantum_page_labels_costs_and_staleness():
     text = _text(at)
     for required in labels.REQUIRED_ON_QUANTUM_RESULTS:
         assert required in text, required
-    assert labels.QAE_CI_CAPTION in text and labels.RUNTIME_CAPTION in text and labels.QUERY_CONVENTION in text
+    assert labels.RUNTIME_CAPTION in text and labels.QUERY_CONVENTION in text
+    # 30 shots is outside the calibration study: unknown-coverage warning, no measured range quoted.
+    assert any("outside the calibration study" in w.value and "30 shots" in w.value for w in at.warning)
+    assert labels.QAE_CI_CAPTION not in text
     assert _metric(at, labels.QUERY_COMPLEXITY) == f"{30 * (1 + 3 + 5):,}"
     assert f"{labels.QAE_CI}:** [" in text  # interval shown in full on its own line
     assert any("Circuit check" in s.value for s in at.success)
@@ -131,6 +134,74 @@ def test_quantum_page_labels_costs_and_staleness():
 
 
 @needs_qiskit
+def _quantum_text(at, length, shots):
+    at.switch_page("views/quantum.py").run()
+    at.slider(key="q_len").set_value(length).run()
+    at.select_slider(key="q_shots").set_value(shots).run()
+    _click(at, "Run QAE on the simulator")
+    return _text(at)
+
+
+@needs_qiskit
+def test_quantum_calibrated_settings_quote_the_study():
+    at = _app()
+    text = _quantum_text(at, 3, 100)  # m up to 2, 100 shots: inside the tested settings
+    assert labels.QAE_CI_CAPTION in text
+    assert not any("outside the calibration study" in w.value for w in at.warning)
+    assert "Outside the calibration study" not in text
+
+
+@needs_qiskit
+@pytest.mark.parametrize("length, shots, reason", [
+    (3, 30, "30 shots per circuit instead of 100"),
+    (7, 100, "Grover power up to m = 32, beyond m = 16"),
+])
+def test_quantum_uncalibrated_settings_warn_and_do_not_quote_coverage(length, shots, reason):
+    at = _app()
+    at.switch_page("views/quantum.py").run()
+    at.slider(key="q_len").set_value(length).run()
+    at.select_slider(key="q_shots").set_value(shots).run()
+    assert any(reason in c.value and "coverage will be unknown" in c.value for c in at.caption)  # before running
+    _click(at, "Run QAE on the simulator")
+    text = _text(at)
+    warnings = [w.value for w in at.warning if "outside the calibration study" in w.value]
+    assert warnings and reason in warnings[0] and "unknown" in warnings[0]
+    assert labels.QAE_CI_CAPTION not in text
+    assert labels.COVERAGE_RANGE[0] not in text and labels.COVERAGE_RANGE[1] not in text
+
+
+@needs_qiskit
+def test_quantum_timing_separates_compilation():
+    at = _app()
+    _quantum_text(at, 3, 100)
+    r = at.session_state["quantum_run"].result
+    assert _metric(at, "Execution total") == f"{r.build_time_s + r.sampling_time_s + r.estimation_time_s:.3f} s"
+    assert _metric(at, "Compile (transpile)") == f"{r.transpile_time_s:.3f} s"
+    assert labels.COMPILE_NOTE in _text(at)
+
+
+@needs_qiskit
+@pytest.mark.parametrize("shots, calibrated", [(100, True), (30, False)])
+def test_comparison_calibration_notice_and_timing_split(shots, calibrated):
+    at = _app()
+    at.switch_page("views/comparison.py").run()
+    at.slider(key="cmp_len").set_value(2).run()
+    at.select_slider(key="cmp_shots").set_value(shots).run()
+    _click(at, "Run matched comparison")
+    text = _text(at)
+    uncal = [w.value for w in at.warning if "outside the calibration study" in w.value]
+    if calibrated:
+        assert labels.QAE_CI_CAPTION in text and not uncal
+    else:
+        assert uncal and f"{shots} shots" in uncal[0] and labels.QAE_CI_CAPTION not in text
+    comp = at.session_state["comparison_run"].comparison
+    execution = comp.qae.build_time_s + comp.qae.sampling_time_s + comp.qae.estimation_time_s
+    assert _metric(at, labels.QAE_EXECUTION_TIME) == f"{execution:.4f} s"
+    assert _metric(at, labels.QAE_COMPILE_TIME) == f"{comp.qae.transpile_time_s:.4f} s"
+    assert _metric(at, "QAE execution ÷ MC time") == f"{execution / comp.mc_time_s:,.0f}×"
+    assert labels.COMPILE_NOTE in text
+
+
 def test_comparison_page_matched_and_scaling():
     at = _app()
     at.switch_page("views/comparison.py").run()

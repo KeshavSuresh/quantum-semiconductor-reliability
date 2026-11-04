@@ -8,7 +8,15 @@ import streamlit as st
 from qsr.dashboard import labels, services
 from qsr.dashboard.config import LIMITS, SHOT_CHOICES, DashboardInputError
 
-from components.state import cached_quantum, detail_line, model_summary, require_model, stale_banner
+from components.state import (
+    cached_quantum,
+    detail_line,
+    interval_scope_notice,
+    model_summary,
+    require_model,
+    scope_preview,
+    stale_banner,
+)
 
 st.title("Quantum analysis")
 inputs, built = require_model()
@@ -42,6 +50,7 @@ sch = services.schedule_for(length)  # never import qsr.quantum on a page (see s
 calls = services.oracle_calls_for(length, shots)
 st.caption(f"Grover powers m = {services.sequence_label(sch)} → oracle queries = {shots} × "
            f"{sum(2 * m + 1 for m in sch)} = **{calls:,}**. {labels.QUERY_CONVENTION}")
+scope_preview(sch, shots)
 
 current = services.fingerprint(inputs, schedule_length=length, shots=shots)
 if st.button("Run QAE on the simulator", type="primary"):
@@ -64,7 +73,7 @@ c2.metric(f"{labels.EXACT} (for this run)", services.format_probability(run.exac
 c3.metric("|estimate − exact|", services.format_probability(abs(r.estimate - run.exact)))
 detail_line(f"**{labels.QAE_CI}:** {services.format_interval(r.ci_low, r.ci_high)}",
             f"**Failures observed:** {services.sequence_label(r.hits)} (per circuit, out of {r.shots} shots each)")
-st.caption(labels.QAE_CI_CAPTION)
+interval_scope_notice(r)
 if r.n_ci_regions > 1:
     st.warning(labels.MULTI_REGION_WARNING.format(n=r.n_ci_regions), icon="⚠️")
 se = r.std_error_theory
@@ -87,12 +96,18 @@ st.dataframe(pd.DataFrame(services.circuit_rows(r)), hide_index=True, width="str
              column_config={"Observed fraction": st.column_config.NumberColumn(format="%.3f")})
 
 st.subheader(labels.SIMULATOR_TIME)
-t1, t2, t3, t4, t5 = st.columns(5)
+timing = services.qae_timing(r)
+st.markdown(f"**{labels.QAE_EXECUTION_TIME}**")
+t1, t2, t3, t4 = st.columns(4)
 t1.metric("Build circuits", f"{r.build_time_s:.3f} s")
-t2.metric("Compile (for depth)", f"{r.transpile_time_s:.3f} s")
-t3.metric("Simulate", f"{r.sampling_time_s:.3f} s")
-t4.metric("Estimate", f"{r.estimation_time_s:.3f} s")
-t5.metric("Total", f"{r.total_time_s:.3f} s")
+t2.metric("Simulate", f"{r.sampling_time_s:.3f} s")
+t3.metric("Estimate", f"{r.estimation_time_s:.3f} s")
+t4.metric("Execution total", f"{timing.execution_s:.3f} s")
+st.markdown(f"**{labels.QAE_COMPILE_TIME}** (not needed for the estimate)")
+d1, d2, _, _ = st.columns(4)
+d1.metric("Compile (transpile)", f"{timing.diagnostics_compile_s:.3f} s")
+d2.metric("Everything incl. compile", f"{timing.total_s:.3f} s")
+st.caption(labels.COMPILE_NOTE)
 st.caption(labels.RUNTIME_CAPTION)
 st.caption(labels.NO_SPEEDUP)
 st.caption(labels.UNMATCHED_NOTE)

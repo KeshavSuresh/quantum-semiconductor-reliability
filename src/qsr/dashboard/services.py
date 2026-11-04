@@ -359,6 +359,59 @@ def run_scaling(
     )
 
 
+@dataclass(frozen=True)
+class CalibrationStatus:
+    """Whether QAE settings were covered by the interval calibration study."""
+
+    covered: bool
+    reasons: tuple[str, ...]
+
+    @property
+    def reason_text(self) -> str:
+        return "; ".join(self.reasons)
+
+
+def calibration_status(evaluation_schedule: Sequence[int], shots: int) -> CalibrationStatus:
+    """Compare a run's settings with those tested in the calibration study.
+
+    The study (docs/qae_design.md section 8.2) used exactly ``labels.CALIBRATED_SHOTS``
+    shots per circuit and Grover powers up to ``labels.CALIBRATED_MAX_GROVER_POWER``.
+    Pass the settings of the run being displayed (not the current widgets), so a
+    stale result is judged by its own settings.
+    """
+    from qsr.dashboard import labels
+
+    reasons = []
+    if shots != labels.CALIBRATED_SHOTS:
+        reasons.append(f"{shots} shots per circuit instead of {labels.CALIBRATED_SHOTS}")
+    top = max(evaluation_schedule)
+    if top > labels.CALIBRATED_MAX_GROVER_POWER:
+        reasons.append(f"Grover power up to m = {top}, beyond m = {labels.CALIBRATED_MAX_GROVER_POWER}")
+    return CalibrationStatus(covered=not reasons, reasons=tuple(reasons))
+
+
+@dataclass(frozen=True)
+class QAETiming:
+    """Measured QAE wall-clock time, split into execution and diagnostics-only compilation."""
+
+    execution_s: float
+    """Build circuits + simulate + estimate: what producing the estimate requires."""
+    diagnostics_compile_s: float
+    """Transpilation used only to report circuit depth and CX counts."""
+
+    @property
+    def total_s(self) -> float:
+        return self.execution_s + self.diagnostics_compile_s
+
+
+def qae_timing(result: Any) -> QAETiming:
+    """Split a QAEResult's measured times (read from the result; nothing is re-measured)."""
+    return QAETiming(
+        execution_s=result.build_time_s + result.sampling_time_s + result.estimation_time_s,
+        diagnostics_compile_s=result.transpile_time_s,
+    )
+
+
 def format_probability(p: float) -> str:
     """Compact, precision-preserving display of a probability."""
     if p is None or (isinstance(p, float) and math.isnan(p)):

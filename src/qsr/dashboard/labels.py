@@ -11,6 +11,9 @@ POOLED_COVERAGE = "0.943"
 POOLED_COVERAGE_COUNTS = "56,602 / 60,000"
 COVERAGE_RANGE = ("0.900", "0.994")
 WORST_CELL_COVERAGE = "0.9286"
+#: Settings covered by that calibration study (docs/qae_design.md section 8.2).
+CALIBRATED_SHOTS = 100
+CALIBRATED_MAX_GROVER_POWER = 16
 
 # --- the five quantities that must never be confused ---
 EXACT = "Exact model probability"
@@ -32,7 +35,17 @@ QAE_CI_CAPTION = (
     "This interval is **approximate**, not a guaranteed 95 % interval. In the project's calibration "
     f"study, its measured coverage was {POOLED_COVERAGE} overall ({POOLED_COVERAGE_COUNTS} trials) and "
     f"ranged from {COVERAGE_RANGE[0]} to {COVERAGE_RANGE[1]} depending on the probability and schedule "
-    "(100 shots per circuit). See the Limitations page."
+    f"({CALIBRATED_SHOTS} shots per circuit, Grover powers up to m = {CALIBRATED_MAX_GROVER_POWER}). "
+    "See the Limitations page."
+)
+UNCALIBRATED_WARNING = (
+    "**These settings are outside the calibration study** ({reasons}). The study only tested "
+    f"{CALIBRATED_SHOTS} shots per circuit with Grover powers up to m = {CALIBRATED_MAX_GROVER_POWER}, so the "
+    "actual coverage of this approximate interval is **unknown** for these settings. Treat it as a rough "
+    "guide only."
+)
+UNCALIBRATED_PREVIEW = (
+    "⚠️ Outside the calibration study's tested settings ({reasons}): interval coverage will be unknown."
 )
 MULTI_REGION_WARNING = (
     "The data are ambiguous: the likelihood supports {n} separate ranges of p. The interval shown "
@@ -44,6 +57,12 @@ SE_NA = "n/a (too close to p = 0 or 1 for the delta method)"
 QUERY_CONVENTION = (
     "One oracle query = one application of the state-preparation circuit A (or its inverse A†) in one shot. "
     "A circuit Qᵐ·A uses 2m + 1 of them, so the total is shots × Σ(2m + 1)."
+)
+QAE_EXECUTION_TIME = "QAE execution (build + simulate + estimate)"
+QAE_COMPILE_TIME = "Compile for circuit diagnostics"
+COMPILE_NOTE = (
+    "Compilation (transpiling to {rz, sx, x, cx}) is done only to report circuit depth and CX counts. "
+    "The estimate does not use it, so it is shown separately and left out of the QAE ÷ MC ratio."
 )
 RUNTIME_CAPTION = (
     "Times are measured on this computer's **classical simulator** of a quantum computer. They are not "

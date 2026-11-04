@@ -8,9 +8,11 @@ from qsr.dashboard.config import LIMITS, SHOT_CHOICES, DashboardInputError
 
 from components.state import (
     cached_comparison,
+    interval_scope_notice,
     model_summary,
     plot_theme,
     require_model,
+    scope_preview,
     show_figure,
     stale_banner,
 )
@@ -35,6 +37,7 @@ shots = c2.select_slider("Shots per circuit", options=SHOT_CHOICES, value=100, k
 sch = services.schedule_for(length)
 st.caption(f"Budget: {shots} × {sum(2 * m + 1 for m in sch)} = {services.oracle_calls_for(length, shots):,} "
            "oracle queries for QAE = the same number of Monte Carlo samples.")
+scope_preview(sch, shots)
 
 current = services.fingerprint(inputs, schedule_length=length, shots=shots)
 if st.button("Run matched comparison", type="primary"):
@@ -59,17 +62,21 @@ else:
         "|error| vs exact": st.column_config.NumberColumn(format="%.6f"),
         "Model evaluations": st.column_config.NumberColumn(format="%d"),
     })
-    st.caption(f"Monte Carlo interval: {labels.MC_CI}. QAE interval: {labels.QAE_CI}. {labels.QAE_CI_CAPTION}")
+    st.caption(f"Monte Carlo interval: {labels.MC_CI}. QAE interval: {labels.QAE_CI}.")
+    interval_scope_notice(comp.qae)
     if comp.qae.n_ci_regions > 1:
         st.warning(labels.MULTI_REGION_WARNING.format(n=comp.qae.n_ci_regions), icon="⚠️")
     st.caption(labels.QUERY_VS_RUNTIME)
 
     st.markdown(f"**{labels.SIMULATOR_TIME}** (measured separately; not part of the accuracy comparison)")
-    r1, r2, r3 = st.columns(3)
+    timing = services.qae_timing(comp.qae)
+    r1, r2, r3, r4 = st.columns(4)
     r1.metric("Classical Monte Carlo", f"{comp.mc_time_s:.4f} s")
-    r2.metric("QAE on the simulator (total)", f"{comp.qae.total_time_s:.4f} s")
-    ratio = comp.qae.total_time_s / comp.mc_time_s if comp.mc_time_s > 0 else float("inf")
-    r3.metric("QAE ÷ MC time", f"{ratio:,.0f}×")
+    r2.metric(labels.QAE_EXECUTION_TIME, f"{timing.execution_s:.4f} s")
+    ratio = timing.execution_s / comp.mc_time_s if comp.mc_time_s > 0 else float("inf")
+    r3.metric("QAE execution ÷ MC time", f"{ratio:,.0f}×")
+    r4.metric(labels.QAE_COMPILE_TIME, f"{timing.diagnostics_compile_s:.4f} s")
+    st.caption(labels.COMPILE_NOTE)
     st.caption(labels.RUNTIME_CAPTION)
 
 # --------------------------------------------------------------------------

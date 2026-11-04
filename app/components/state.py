@@ -53,6 +53,26 @@ def stale_banner(run: Any, current: services.Fingerprint) -> bool:
     return True
 
 
+def interval_scope_notice(result: Any) -> None:
+    """Calibration caption for settings the study tested; otherwise an 'unknown coverage' warning.
+
+    Judged from the displayed run's own settings, so stale results are handled correctly.
+    The measured coverage range is never shown for untested settings.
+    """
+    status = services.calibration_status(result.evaluation_schedule, result.shots)
+    if status.covered:
+        st.caption(labels.QAE_CI_CAPTION)
+    else:
+        st.warning(labels.UNCALIBRATED_WARNING.format(reasons=status.reason_text), icon="⚠️")
+
+
+def scope_preview(schedule: tuple[int, ...], shots: int) -> None:
+    """Before a run: flag settings outside the calibration study."""
+    status = services.calibration_status(schedule, shots)
+    if not status.covered:
+        st.caption(labels.UNCALIBRATED_PREVIEW.format(reasons=status.reason_text))
+
+
 def detail_line(*parts: str) -> None:
     """Full-width line for values that must never be truncated (intervals, counts)."""
     st.markdown(" · ".join(parts))

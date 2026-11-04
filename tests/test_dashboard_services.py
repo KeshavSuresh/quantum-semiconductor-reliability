@@ -248,6 +248,43 @@ def test_quantum_limits(kw):
         run_quantum(DEFAULT_INPUTS, **kw)
 
 
+# --- calibration scope and timing split ---------------------------------------------
+
+@pytest.mark.parametrize("schedule, shots, covered, fragments", [
+    ((0, 1, 2, 4, 8, 16), 100, True, []),
+    ((0,), 100, True, []),
+    ((0, 1, 2, 4, 8, 16, 32), 100, False, ["m = 32"]),
+    ((0, 1, 2), 30, False, ["30 shots per circuit instead of 100"]),
+    ((0, 1, 2, 4, 8, 16, 32), 1000, False, ["1000 shots", "m = 32"]),
+])
+def test_calibration_status(schedule, shots, covered, fragments):
+    from qsr.dashboard.services import calibration_status
+
+    status = calibration_status(schedule, shots)
+    assert status.covered is covered
+    assert len(status.reasons) == len(fragments)
+    for f in fragments:
+        assert f in status.reason_text
+
+
+def test_calibration_scope_matches_design_document():
+    doc = (ROOT / "docs" / "qae_design.md").read_text(encoding="utf-8")
+    assert labels.CALIBRATED_SHOTS == 100 and "N = 100 shots per circuit" in doc
+    assert labels.CALIBRATED_MAX_GROVER_POWER == 16 and "m_max ∈ {0, 1, 2, 4, 8, 16}" in doc
+
+
+def test_qae_timing_split_reads_measured_fields():
+    from types import SimpleNamespace
+
+    from qsr.dashboard.services import qae_timing
+
+    r = SimpleNamespace(build_time_s=0.01, transpile_time_s=0.25, sampling_time_s=0.2, estimation_time_s=0.03)
+    t = qae_timing(r)
+    assert t.execution_s == pytest.approx(0.24)
+    assert t.diagnostics_compile_s == 0.25
+    assert t.total_s == pytest.approx(0.49)
+
+
 # --- formatting, labels, isolation ---------------------------------------------------
 
 def test_format_probability():

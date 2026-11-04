@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "qsr"
 version = "0.1.0"
-description = "Quantum Semiconductor Reliability Explorer: TDDB Weibull reliability with classical Monte Carlo and (later) Quantum Amplitude Estimation."
+description = "Quantum Semiconductor Reliability Explorer: TDDB Weibull reliability with exact, classical Monte Carlo and simulated Quantum Amplitude Estimation (MLAE) estimates, plus an optional Streamlit dashboard."
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"

@@ -42,6 +42,9 @@ st.markdown(
 st.subheader("4. The QAE confidence interval is approximate")
 st.markdown(
     f"- {labels.QAE_CI_CAPTION}\n"
+    f"- The study tested only {labels.CALIBRATED_SHOTS} shots per circuit and Grover powers up to "
+    f"m = {labels.CALIBRATED_MAX_GROVER_POWER}. For any other settings the coverage is **unknown**; the Quantum "
+    "and Comparison pages warn you when you use them.\n"
     f"- The worst probability/schedule combination, re-run with 20,000 trials, had coverage "
     f"{labels.WORST_CELL_COVERAGE}.\n"
     "- Most misses come from the χ² approximation behind the interval being too narrow at 100 shots per "
