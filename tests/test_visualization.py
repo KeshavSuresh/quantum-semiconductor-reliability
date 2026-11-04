@@ -1,4 +1,5 @@
 import json
+import subprocess
 import sys
 
 import numpy as np
@@ -226,5 +227,9 @@ def test_builders_validate_inputs(model, builder):
 
 
 def test_no_qiskit_or_streamlit_imported():
-    assert "qiskit" not in sys.modules
-    assert "streamlit" not in sys.modules
+    # Fresh interpreter: other test modules (e.g. quantum tests) may already have imported Qiskit here.
+    code = (
+        "import sys, qsr.models.uncertainty, qsr.simulation.monte_carlo, qsr.visualization; "
+        "assert 'qiskit' not in sys.modules and 'streamlit' not in sys.modules"
+    )
+    subprocess.run([sys.executable, "-c", code], check=True)
