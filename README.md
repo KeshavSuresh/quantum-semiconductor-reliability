@@ -97,8 +97,15 @@ python examples/milestone3_qae.py --quick
 
 It prints the state-preparation check, a single budget-matched QAE vs Monte
 Carlo run (estimates, CIs, oracle calls, circuit depths, timings) and an
-error-scaling table over 30 fixed seeds. It also writes
+error-scaling table over 30 fixed seeds (0–29). It also writes
 `build/plots/qae_error_vs_queries_light.html`.
+
+Reproduce the confidence-interval calibration study, which takes about 8
+minutes. Add `--quick` for a short preliminary run:
+
+```bash
+python examples/milestone3_ci_calibration.py
+```
 
 ## Usage
 
@@ -153,8 +160,15 @@ The circuit prepares
 using the model's own weights and `component_failure_probabilities(t)`, so
 P(failure ancilla = 1) = Σᵢ wᵢ Fᵢ, the exact mixture probability that classical
 Monte Carlo also estimates. It is estimated with Maximum-Likelihood Amplitude
-Estimation (Suzuki et al. 2020), implemented on core Qiskit with a seeded
-statevector sampler.
+Estimation (Suzuki et al. 2020), implemented on core Qiskit with a statevector
+sampler. Each circuit gets its own seed spawned from one user seed, so runs are
+reproducible and counts are independent across Grover powers.
+
+**Query convention:** one oracle query is one application of `A` or `A†` in one
+shot. A circuit `Q^m A` uses `2m + 1` of them, so the total is
+`shots × Σ(2m_k + 1)`; for example, 100 × 68 = 6,800 for m = 0, 1, 2, 4, 8, 16.
+Classical Monte Carlo gets exactly that many samples. Grover iterates and
+phase-oracle calls (100 × 31 = 3,100) are reported separately and not added in.
 
 ```python
 from qsr.quantum import compare_with_monte_carlo, error_scaling_study, exponential_schedule
@@ -170,21 +184,27 @@ fig = plot_error_vs_queries(rows)                  # RMSE vs oracle calls, log-l
 **How to read the results, and limitations:**
 
 - **Query complexity is not runtime.** "Oracle calls" counts uses of `A` or
-  `A†` (QAE) and samples (MC). In theory the QAE error falls like 1/calls and
-  the MC error like 1/√calls. The measured RMSE follows both.
+  `A†` (QAE) and samples (MC). The dashed curves are theory: the asymptotic
+  Cramér–Rao bound (QAE, ~1/calls) and the binomial standard error
+  (MC, ~1/√calls). The measured RMSE follows both trends.
 - **Wall-clock times are simulator times.** QAE runs on a classical
-  statevector simulator and is several hundred times slower than classical MC
-  here (≈0.42 s vs ≈0.001 s at 13,300 calls). **No practical quantum speed-up
-  is shown or claimed.**
+  statevector simulator and was ≈ 590× slower per run than classical MC here
+  (≈ 0.51 s vs ≈ 0.0009 s at 13,300 calls). **No practical quantum speed-up is
+  shown or claimed.**
 - The Fᵢ are computed classically and loaded as rotation angles. Any
   advantage would apply only to estimating the weighted sum, not to computing Fᵢ.
 - Circuits are noiseless, with no hardware topology or error correction.
   Reported depths use the basis {rz, sx, x, cx} with no connectivity
   constraints, and they grow linearly with the Grover power (921 at m = 16).
   Such depths would be far beyond current noisy hardware.
-- The confidence intervals are asymptotic likelihood-ratio intervals. Coverage
-  over 100 fixed seeds was 88–99 % (95 % nominal). Short schedules can be
-  noisier than theory because the likelihood has several peaks.
+- The confidence intervals are **approximate** 95 % likelihood-ratio intervals.
+  Over 60,000 calibration trials on fresh seeds, pooled coverage was 0.943
+  (Wilson [0.941, 0.945]). Individual cells ranged from 0.900 to 0.994, with
+  under-coverage where the likelihood has several peaks. Full counts are in
+  `docs/qae_design.md` §8, produced by `python examples/milestone3_ci_calibration.py`.
+- The finite-sample MLE has small measurable bias. Its RMSE was 0.83–1.48× the
+  Cramér–Rao bound depending on the schedule, so treat the bound as an
+  asymptotic reference, not a guarantee.
 
 ## Project layout
 
@@ -202,6 +222,7 @@ src/qsr/quantum/amplitude_estimation.py  MLAE estimator, query accounting, depth
 src/qsr/quantum/comparison.py      budget-matched QAE vs Monte Carlo and scaling study
 examples/milestone2_plots.py       Milestone 2 figures → build/plots/*.html
 examples/milestone3_qae.py         Milestone 3 QAE demonstration
+examples/milestone3_ci_calibration.py  CI coverage study (60,000 + 1,500 trials)
 docs/qae_design.md                 QAE design, implementation decisions and results
 tests/                             pytest suite
 ```
