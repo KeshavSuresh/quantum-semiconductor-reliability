@@ -63,9 +63,10 @@ So `p` is the amplitude-squared `a` that QAE estimates.
 
 ## 5. Caveats to report honestly
 
-- The `F_i` values are computed classically and loaded as rotation angles. The
-  quantum speed-up claim concerns only the estimation of the weighted sum given
-  that loading, not computing `F_i`.
+- The `F_i` values are computed classically and loaded as rotation angles. Any
+  theoretical (query-complexity) advantage concerns only the estimation of the
+  weighted sum given that loading, not computing `F_i`. No practical speed-up is
+  claimed.
 - State preparation for arbitrary `w_i` costs `O(2^n)` gates. A fair comparison
   counts oracle queries, and also reports circuit depth separately.
 - Simulators are noiseless unless a noise model is added explicitly.
