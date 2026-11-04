@@ -3,8 +3,10 @@ import subprocess
 import sys
 
 import numpy as np
-import plotly.graph_objects as go
 import pytest
+
+# Plotly is the optional ``viz`` extra: skip (not fail) when it is not installed.
+go = pytest.importorskip("plotly.graph_objects")
 
 from qsr.models.tddb_weibull import weibull_cdf
 from qsr.models.uncertainty import DiscreteEtaModel

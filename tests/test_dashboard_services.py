@@ -4,6 +4,7 @@ These run without Streamlit. Quantum-dependent tests are skipped without Qiskit.
 """
 
 import dataclasses
+import importlib.util
 import os
 import pathlib
 import subprocess
@@ -35,6 +36,8 @@ from qsr.simulation.monte_carlo import estimate_failure_probability
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 needs_qiskit = pytest.mark.skipif(not quantum_available(), reason="Qiskit not installed")
+# run_classical builds its convergence series with the Plotly-backed visualization helper.
+needs_plotly = pytest.mark.skipif(importlib.util.find_spec("plotly") is None, reason="Plotly not installed")
 
 
 def _inputs(**kw):
@@ -163,6 +166,7 @@ def test_convergence_sizes():
     assert s[-1] == 2_000_000 and all(b > a for a, b in zip(s, s[1:]))
 
 
+@needs_plotly
 def test_run_classical_equals_direct_monte_carlo_call():
     run = run_classical(DEFAULT_INPUTS, 30_000)
     model = build_model(DEFAULT_INPUTS).model
@@ -172,11 +176,13 @@ def test_run_classical_equals_direct_monte_carlo_call():
     assert run.fingerprint == fingerprint(DEFAULT_INPUTS, n_samples=30_000)
 
 
+@needs_plotly
 def test_run_classical_reproduces_readme_numbers():
     r = run_classical(DEFAULT_INPUTS, 1_000_000).result
     assert f"{r.estimate:.6f}" == "0.079239"  # milestone1_demo.py / README, seed 2026
 
 
+@needs_plotly
 @pytest.mark.parametrize("n", [10, 3_000_000, 1000.0, True])
 def test_run_classical_limits(n):
     with pytest.raises(DashboardInputError):
@@ -306,6 +312,7 @@ def test_limits_keep_quantum_circuits_small():
     assert ceil(log2(LIMITS.max_components)) + 1 <= 4  # index qubits + ancilla
 
 
+@needs_plotly
 def test_dashboard_package_imports_without_streamlit_or_qiskit():
     code = (
         "import sys; sys.modules['streamlit'] = None; sys.modules['qiskit'] = None\n"

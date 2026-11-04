@@ -1,7 +1,9 @@
 import numpy as np
 import pytest
 
-from qsr.visualization import DARK, plot_error_vs_queries
+pytest.importorskip("plotly")  # optional ``viz`` extra: skip when it is not installed
+
+from qsr.visualization import DARK, plot_error_vs_queries  # noqa: E402
 
 
 def _rows():
