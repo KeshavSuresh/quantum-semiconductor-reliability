@@ -1,8 +1,8 @@
 # Milestone 3 design: Quantum Amplitude Estimation on the shared discrete model
 
-Status: **design only**. No Qiskit code exists yet; this document fixes the
-mathematics so that Milestone 3 estimates exactly the quantity that the
-Milestone 1 classical Monte Carlo estimates.
+Status: **implemented in Milestone 3** (`src/qsr/quantum/`). Sections 1–6 are
+the original design, which is unchanged. Section 7 records the implementation
+decisions and section 8 the verification results.
 
 ## 1. Shared target quantity
 
@@ -59,7 +59,7 @@ So `p` is the amplitude-squared `a` that QAE estimates.
   oracle (`A`) queries `M`, compared with `O(1/sqrt(N))` for `N` classical samples.
 - In Qiskit 2.x the amplitude-estimation algorithms live in the separate
   `qiskit-algorithms` package. The exact package and version choice will be
-  confirmed at the start of Milestone 3.
+  confirmed at the start of Milestone 3. (Resolved in section 7: not used.)
 
 ## 5. Caveats to report honestly
 
@@ -78,3 +78,55 @@ So `p` is the amplitude-squared `a` that QAE estimates.
 3. Error vs. query count for QAE is plotted against error vs. sample count for
    classical MC (`qsr.simulation.monte_carlo`), using the same model, mission time
    and seeds.
+
+## 7. Implementation decisions (Milestone 3)
+
+- **Engine: own Maximum-Likelihood Amplitude Estimation on core Qiskit.**
+  `qiskit-algorithms` 0.4.0 runs on Qiskit 2.6.1 but relies on APIs deprecated
+  since Qiskit 2.1 (`GroverOperator`, `MCXGate.get_num_ancilla_qubits`), so it was
+  not used. The implementation uses only core Qiskit: `StatePreparation` (loads
+  `sqrt(w_i)`), `UCRYGate` (the uniformly controlled RY oracle), the
+  non-deprecated `grover_operator()` function, and the seeded
+  `StatevectorSampler`. The test suite runs with `DeprecationWarning` treated as
+  an error.
+- **Registers:** qubits `0..n-1` hold the η index (Qiskit little-endian), and the
+  last qubit is the failure ancilla. `S_good` is `Z` on the ancilla.
+- **Schedule:** exponential, `m = 0, 1, 2, 4, …` (Suzuki et al. 2020), with the
+  same shot count per circuit.
+- **Estimator:** maximise `sum_k h_k log sin²(M_k θ) + (N − h_k) log cos²(M_k θ)`,
+  `M_k = 2 m_k + 1`, with a global grid search followed by bounded local refinement.
+- **Confidence interval:** likelihood-ratio interval (χ²₁ threshold), mapped
+  through `sin²`. The Fisher (Wald) interval was tried first and under-covered
+  for short schedules (77–90 % coverage at the 95 % level), so it is reported
+  only as an asymptotic standard error `sin(2θ)/sqrt(4 N Σ M_k²)`.
+- **Query accounting:**
+  - `state_preparation_calls = N · Σ(2 m_k + 1)`: uses of `A` or `A†`. This is
+    the "oracle calls" budget, and classical Monte Carlo is given exactly this
+    many samples.
+  - `grover_applications = N · Σ m_k` is reported as well.
+- **Circuit metrics:** depth and CX count after
+  `transpile(basis_gates=[rz, sx, x, cx], optimization_level=1, seed_transpiler=0)`.
+  No hardware topology is applied, so real devices would need more gates.
+- **Timing:** wall-clock time measured separately for build, transpile,
+  simulate and estimate. These are simulator timings only.
+
+## 8. Verification results (example model, t = 5000 h)
+
+1. Statevector `P(anc = 1)` matches `model.failure_probability(t)` to 5.6e-17.
+   It is tested to 1e-12 for K = 1, 2, 3 and 5 (padded to 8) and for t from 0 to 10⁶ h.
+2. `P(anc = 1 after Q^m A) = sin²((2m+1)θ)` holds to 1e-10 for m up to 8 (tested).
+3. Likelihood-ratio CI coverage over 100 fixed seeds: 0.88–0.99 across
+   schedules (95 % nominal).
+4. Error vs. oracle calls, RMSE over 30 seeds at 100 shots per circuit:
+
+| m_max | calls | QAE RMSE | MC RMSE |
+|---|---|---|---|
+| 0 | 100 | 0.0308 | 0.0283 |
+| 4 | 1,800 | 0.0022 | 0.0056 |
+| 32 | 13,300 | 0.00039 | 0.0026 |
+
+   Query-complexity scaling follows theory: about 1/calls for QAE and
+   1/sqrt(calls) for MC. The m = 2 point is noisier than theory
+   (likelihood multimodality at short schedules).
+5. Wall-clock time per run on this simulator, at 13,300 calls: QAE ≈ 0.42 s,
+   MC ≈ 0.001 s. **No practical quantum speed-up is shown or claimed.**

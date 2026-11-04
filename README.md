@@ -10,7 +10,7 @@ Quantum Semiconductor Reliability Explorer: time-dependent dielectric breakdown
 |---|---|---|
 | 1 | Weibull model, discrete η-uncertainty model, exact reference, classical Monte Carlo, Wilson CI, tests | Done |
 | 2 | Plotly visualizations of the shared model (curves, Monte Carlo vs exact) | Done |
-| 3 | Qiskit QAE on the shared model ([design](docs/qae_design.md)) | Planned |
+| 3 | Qiskit Quantum Amplitude Estimation on the shared model ([design and results](docs/qae_design.md)) | Done |
 | 4 | Streamlit application | Planned |
 | 5 | CI and documentation | Planned |
 
@@ -36,22 +36,26 @@ examples use **hours**. β and the weights are dimensionless.
 ## Setup
 
 Requires Python ≥ 3.10 (developed on 3.13). The core model and Monte Carlo
-need only NumPy and SciPy. Plotly is an optional `viz` extra for the figures.
-Qiskit and Streamlit are **not** needed yet.
-
-`requirements-dev.txt` installs everything used in development
-(`-e .[dev,viz]`). To install only what you need:
-
-```bash
-pip install -e .            # model + Monte Carlo only
-pip install -e ".[viz]"     # + Plotly figures
-```
+need only NumPy and SciPy. Plotly (`viz`) and Qiskit (`quantum`) are optional
+extras. Streamlit is **not** needed yet.
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
 ```
+
+`requirements-dev.txt` installs everything used in development
+(`-e .[dev,viz,quantum]`). To install only what you need:
+
+```bash
+pip install -e .                    # model + Monte Carlo only
+pip install -e ".[viz]"             # + Plotly figures
+pip install -e ".[quantum]"         # + Qiskit amplitude estimation (tested with Qiskit 2.6.1)
+```
+
+Without Qiskit, the classical code and its tests still work, and the quantum
+tests are skipped.
 
 Run the tests:
 
@@ -79,6 +83,22 @@ python examples/milestone2_plots.py --dark
 Open the `.html` files in any browser; hovering shows exact values. Add
 `--cdn` for smaller files that load plotly.js from the internet, or use
 `--out-dir PATH` to choose a different folder.
+
+Run the Milestone 3 quantum demonstration, which takes about 30 s and needs
+the `quantum` and `viz` extras:
+
+```bash
+python examples/milestone3_qae.py
+```
+
+```bash
+python examples/milestone3_qae.py --quick
+```
+
+It prints the state-preparation check, a single budget-matched QAE vs Monte
+Carlo run (estimates, CIs, oracle calls, circuit depths, timings) and an
+error-scaling table over 30 fixed seeds. It also writes
+`build/plots/qae_error_vs_queries_light.html`.
 
 ## Usage
 
@@ -124,6 +144,48 @@ palette uses a fixed order that was checked for colour-vision deficiency.
 Lines also carry a legend and direct labels, so identity never relies on
 colour alone. Models with more than 8 components are drawn as one muted group.
 
+### Quantum Amplitude Estimation (Milestone 3)
+
+The circuit prepares
+
+    A|0⟩ = Σᵢ √wᵢ |i⟩ ⊗ [ √(1 − Fᵢ) |0⟩ + √Fᵢ |1⟩ ],   Fᵢ = F(t | β, ηᵢ)
+
+using the model's own weights and `component_failure_probabilities(t)`, so
+P(failure ancilla = 1) = Σᵢ wᵢ Fᵢ, the exact mixture probability that classical
+Monte Carlo also estimates. It is estimated with Maximum-Likelihood Amplitude
+Estimation (Suzuki et al. 2020), implemented on core Qiskit with a seeded
+statevector sampler.
+
+```python
+from qsr.quantum import compare_with_monte_carlo, error_scaling_study, exponential_schedule
+from qsr.visualization import plot_error_vs_queries
+
+c = compare_with_monte_carlo(model, 5e3, seed=2026, evaluation_schedule=exponential_schedule(6), shots=100)
+print(c.exact, c.qae.estimate, (c.qae.ci_low, c.qae.ci_high), c.qae.state_preparation_calls)
+print(c.mc.estimate, c.mc.n_samples)              # classical MC with the same budget and seed
+rows = error_scaling_study(model, 5e3, seeds=range(30))
+fig = plot_error_vs_queries(rows)                  # RMSE vs oracle calls, log-log
+```
+
+**How to read the results, and limitations:**
+
+- **Query complexity is not runtime.** "Oracle calls" counts uses of `A` or
+  `A†` (QAE) and samples (MC). In theory the QAE error falls like 1/calls and
+  the MC error like 1/√calls. The measured RMSE follows both.
+- **Wall-clock times are simulator times.** QAE runs on a classical
+  statevector simulator and is several hundred times slower than classical MC
+  here (≈0.42 s vs ≈0.001 s at 13,300 calls). **No practical quantum speed-up
+  is shown or claimed.**
+- The Fᵢ are computed classically and loaded as rotation angles. Any
+  advantage would apply only to estimating the weighted sum, not to computing Fᵢ.
+- Circuits are noiseless, with no hardware topology or error correction.
+  Reported depths use the basis {rz, sx, x, cx} with no connectivity
+  constraints, and they grow linearly with the Grover power (921 at m = 16).
+  Such depths would be far beyond current noisy hardware.
+- The confidence intervals are asymptotic likelihood-ratio intervals. Coverage
+  over 100 fixed seeds was 88–99 % (95 % nominal). Short schedules can be
+  noisier than theory because the likelihood has several peaks.
+
 ## Project layout
 
 ```
@@ -134,8 +196,13 @@ src/qsr/simulation/monte_carlo.py  classical Monte Carlo and Wilson interval
 src/qsr/visualization/plots.py     Plotly figure builders and their data functions
 src/qsr/visualization/theme.py     light/dark colour themes and shared layout
 examples/milestone1_demo.py        Milestone 1 demonstration script
+src/qsr/visualization/scaling.py   error-vs-oracle-calls figure (no Qiskit import)
+src/qsr/quantum/state_preparation.py  circuit A: weight loading + uniformly controlled RY
+src/qsr/quantum/amplitude_estimation.py  MLAE estimator, query accounting, depth, timing
+src/qsr/quantum/comparison.py      budget-matched QAE vs Monte Carlo and scaling study
 examples/milestone2_plots.py       Milestone 2 figures → build/plots/*.html
-docs/qae_design.md                 Milestone 3 QAE mathematical design
+examples/milestone3_qae.py         Milestone 3 QAE demonstration
+docs/qae_design.md                 QAE design, implementation decisions and results
 tests/                             pytest suite
 ```
 
