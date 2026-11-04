@@ -22,7 +22,7 @@ from qsr.visualization import (
     plot_mc_vs_exact,
     run_mc_convergence,
 )
-from qsr.visualization.theme import MAX_CATEGORICAL
+from qsr.visualization.theme import COMPONENT_DASHES, MAX_CATEGORICAL
 
 # Time unit for all tests: hours.
 MISSION_TIME = 5.0e3
@@ -150,17 +150,47 @@ def test_component_figure_traces_and_data(model):
     assert mixture.name.startswith("Mixture")
     np.testing.assert_array_equal(mixture.y, model.failure_probability(t))
     assert mixture.line.width > fig.data[0].line.width
-    colors = [tr.line.color for tr in fig.data[:-1]]
-    assert colors == list(LIGHT.series[:3])  # fixed categorical order
+    # Components: ink with a fixed dash pattern per slot; colour is reserved for classical/quantum.
+    assert [tr.line.dash for tr in fig.data[:-1]] == list(COMPONENT_DASHES[:3])
+    assert {tr.line.color for tr in fig.data[:-1]} == {LIGHT.ink_secondary}
+    assert LIGHT.classical not in {tr.line.color for tr in fig.data} and LIGHT.quantum not in {tr.line.color for tr in fig.data}
     assert {a.text for a in fig.layout.annotations} == {"η₁", "η₂", "η₃", "Mixture"}
     assert fig.layout.xaxis.title.text == "Time (hours)"
 
 
-def test_component_colours_follow_entity_not_rank():
-    # Same eta in slot 1 keeps colour 1 regardless of what else is in the model.
+def test_component_styles_follow_entity_not_rank():
+    # Same eta in slot 1 keeps dash pattern 1 regardless of what else is in the model.
     a = plot_component_curves(DiscreteEtaModel(beta=2, etas=[1e4, 2e4], weights=[0.5, 0.5]))
     b = plot_component_curves(DiscreteEtaModel(beta=2, etas=[1e4, 2e4, 3e4], weights=[0.4, 0.3, 0.3]))
-    assert a.data[0].line.color == b.data[0].line.color == LIGHT.series[0]
+    assert a.data[0].line.dash == b.data[0].line.dash == COMPONENT_DASHES[0]
+
+
+def test_legends_sit_below_the_plot_so_wrapping_never_hits_the_title(model):
+    # A legend above the plot grows upward into the title when it wraps on a narrow screen.
+    t = 5_000.0
+    figs = [
+        plot_failure_and_reliability(model, mission_time=t),
+        plot_component_curves(model, mission_time=t),
+        plot_mc_vs_exact(model, run_mc_convergence(model, t, [100, 1_000], seed=1)),
+    ]
+    for fig in figs:
+        legend = fig.layout.legend
+        assert (legend.yref, legend.yanchor, legend.orientation) == ("container", "bottom", "h")
+        assert fig.layout.margin.b >= 120
+
+
+def test_semantic_colours_are_consistent_across_figures(model):
+    """Classical = orange, quantum = blue, reference = ink, in every figure."""
+    from qsr.visualization import plot_error_vs_queries
+
+    mc = plot_mc_vs_exact(model, run_mc_convergence(model, MISSION_TIME, [1_000, 10_000], seed=SEED))
+    assert mc.data[1].marker.color == LIGHT.classical and mc.data[0].line.color == LIGHT.reference
+    rows = [{"oracle_calls": n, "qae_rmse": 1 / n, "mc_rmse": n ** -0.5, "qae_crb_se": 1 / n, "mc_binomial_se": n ** -0.5}
+            for n in (100, 400)]
+    sc = plot_error_vs_queries(rows)
+    assert sc.data[0].line.color == LIGHT.quantum and sc.data[2].line.color == LIGHT.classical
+    fr = plot_failure_and_reliability(model)
+    assert {tr.line.color for tr in fr.data} == {LIGHT.reference}
 
 
 def test_many_components_grouped_without_generated_hues():

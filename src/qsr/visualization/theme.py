@@ -33,6 +33,20 @@ class Theme:
         """Colour for the weighted mixture curve and exact reference: primary ink."""
         return self.ink_primary
 
+    # Visual semantics used by every figure and by the dashboard's result badges:
+    # reference = ink, classical Monte Carlo = orange, quantum MLAE = blue.
+    @property
+    def reference(self) -> str:
+        return self.ink_primary
+
+    @property
+    def classical(self) -> str:
+        return self.series[1]
+
+    @property
+    def quantum(self) -> str:
+        return self.series[0]
+
 
 LIGHT = Theme(
     name="light",
@@ -58,6 +72,10 @@ DARK = Theme(
 
 #: Maximum number of series that get their own categorical colour.
 MAX_CATEGORICAL = len(LIGHT.series)
+#: Dash patterns that distinguish η components (drawn in ink, never in the
+#: classical/quantum colours). Up to MAX_CATEGORICAL components are drawn individually.
+COMPONENT_DASHES = ("solid", "dash", "dot", "dashdot", "longdash", "longdashdot", "5px,2px,1px,2px", "1px,3px")
+FONT_FAMILY = "'Source Sans 3', 'Source Sans Pro', system-ui, -apple-system, 'Segoe UI', sans-serif"
 
 LINE_WIDTH = 2
 MIXTURE_LINE_WIDTH = 3
@@ -81,21 +99,25 @@ def apply_layout(fig: go.Figure, theme: Theme, *, title: str, x_title: str, y_ti
         title_font=dict(color=theme.ink_secondary),
     )
     fig.update_layout(
-        title=dict(text=title, x=0.0, xanchor="left", font=dict(color=theme.ink_primary, size=17)),
+        title=dict(text=title, x=0.0, xanchor="left", font=dict(color=theme.ink_primary, size=15)),
         paper_bgcolor=theme.surface,
         plot_bgcolor=theme.surface,
-        font=dict(family="Inter, system-ui, -apple-system, Segoe UI, sans-serif", color=theme.ink_secondary, size=13),
+        font=dict(family=FONT_FAMILY, color=theme.ink_secondary, size=13),
+        # Legend anchored to the bottom of the figure container, below the x-axis title. If it
+        # wraps onto a second line on a narrow screen it grows into the reserved bottom margin,
+        # never into the title or the plot area.
         legend=dict(
             orientation="h",
+            yref="container",
             yanchor="bottom",
-            y=1.02,
+            y=0.02,
             xanchor="left",
             x=0.0,
             font=dict(color=theme.ink_secondary),
             bgcolor="rgba(0,0,0,0)",
         ),
         hoverlabel=dict(bgcolor=theme.surface, bordercolor=theme.axis_line, font=dict(color=theme.ink_primary)),
-        margin=dict(l=70, r=40, t=90, b=60),
+        margin=dict(l=70, r=40, t=60, b=130),
     )
     fig.update_xaxes(title_text=x_title, **axis)
     fig.update_yaxes(title_text=y_title, **axis)

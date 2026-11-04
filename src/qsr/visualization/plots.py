@@ -27,6 +27,7 @@ from qsr.models.uncertainty import DiscreteEtaModel
 from qsr.simulation.monte_carlo import MonteCarloResult, estimate_failure_probability
 from qsr.validation import check_nonnegative_finite, check_positive_finite, check_positive_int
 from qsr.visualization.theme import (
+    COMPONENT_DASHES,
     LIGHT,
     LINE_WIDTH,
     MARKER_SIZE,
@@ -259,14 +260,15 @@ def plot_failure_and_reliability(
 
     fig = go.Figure()
     series = [
-        ("Failure probability F(t)", data["mixture_failure"], theme.series[0]),
-        ("Reliability R(t)", data["mixture_reliability"], theme.series[1]),
+        # Both curves are exact reference quantities: ink, distinguished by dash pattern.
+        ("Failure probability F(t)", data["mixture_failure"], "solid"),
+        ("Reliability R(t)", data["mixture_reliability"], "dash"),
     ]
-    for name, y, color in series:
+    for name, y, dash in series:
         fig.add_trace(go.Scatter(
             x=t, y=y, mode="lines", name=name,
-            line=dict(color=color, width=LINE_WIDTH, shape="spline"),
-            hovertemplate=f"%{{y:.4f}}<extra>{name}</extra>",
+            line=dict(color=theme.reference, width=LINE_WIDTH, shape="spline", dash=dash),
+            hovertemplate=f"t = %{{x:,.0f}} {unit}<br>%{{y:.4f}}<extra>{name}</extra>",
         ))
     _add_direct_labels(fig, t, np.vstack([y for _, y, _ in series]), ["F(t)", "R(t)"], theme)
 
@@ -314,9 +316,11 @@ def plot_component_curves(
             name="Components" if grouped else name,
             legendgroup="components" if grouped else None,
             showlegend=(not grouped) or i == 0,
-            line=dict(color=theme.ink_muted if grouped else theme.series[i], width=1 if grouped else LINE_WIDTH),
+            # Components: secondary ink with distinct dashes (colour is reserved for classical/quantum).
+            line=dict(color=theme.ink_muted if grouped else theme.ink_secondary, width=1 if grouped else LINE_WIDTH,
+                      dash="solid" if grouped else COMPONENT_DASHES[i]),
             opacity=0.6 if grouped else 1.0,
-            hovertemplate=f"%{{y:.4f}}<extra>{name}</extra>",
+            hovertemplate=f"t = %{{x:,.0f}} {unit}<br>%{{y:.4f}}<extra>{name}</extra>",
         ))
         label_texts.append(f"η{_subscript(i + 1)}")
 
@@ -324,7 +328,7 @@ def plot_component_curves(
     fig.add_trace(go.Scatter(
         x=t, y=data["mixture_failure"], mode="lines", name=mixture_name,
         line=dict(color=theme.mixture, width=MIXTURE_LINE_WIDTH),
-        hovertemplate=f"%{{y:.4f}}<extra>{mixture_name}</extra>",
+        hovertemplate=f"t = %{{x:,.0f}} {unit}<br>%{{y:.4f}}<extra>{mixture_name}</extra>",
     ))
     label_texts.append("Mixture")
 
@@ -379,9 +383,9 @@ def plot_mc_vs_exact(
     pct = f"{confidence * 100:g}%"
     fig.add_trace(go.Scatter(
         x=n, y=est, mode="markers", name=f"Monte Carlo p̂ ± {pct} Wilson CI",
-        marker=dict(color=theme.series[0], size=MARKER_SIZE, line=dict(color=theme.surface, width=2)),
+        marker=dict(color=theme.classical, size=MARKER_SIZE, line=dict(color=theme.surface, width=2)),
         error_y=dict(type="data", symmetric=False, array=hi - est, arrayminus=est - lo,
-                     color=theme.series[0], thickness=2, width=6),
+                     color=theme.classical, thickness=2, width=6),
         customdata=custom,
         hovertemplate=(
             "n = %{x:,}<br>p̂ = %{y:.6f}<br>"

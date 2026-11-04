@@ -48,8 +48,8 @@ def plot_error_vs_queries(rows: Sequence[Mapping[str, float]], *, theme: Theme =
 
     fig = go.Figure()
     series = [
-        ("QAE (MLAE)", "qae", "qae_crb_se", "theory: Cramér–Rao bound", theme.series[0]),
-        ("Classical Monte Carlo", "mc", "mc_binomial_se", "theory: binomial SE", theme.series[1]),
+        ("QAE (MLAE)", "qae", "qae_crb_se", "theory: Cramér–Rao bound", theme.quantum),
+        ("Classical Monte Carlo", "mc", "mc_binomial_se", "theory: binomial SE", theme.classical),
     ]
     for name, key, theory_key, theory_label, color in series:
         y = np.array([r[f"{key}_rmse"] for r in rs], dtype=float)
