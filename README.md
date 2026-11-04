@@ -268,6 +268,11 @@ the importing thread alive.
 
 The dashboard is for local use and has not been deployed.
 
+**Presenting the project:** [`docs/demo_guide.md`](docs/demo_guide.md) is a 5–7 minute
+live-demo script with exact clicks and expected numbers.
+[`docs/presentation.md`](docs/presentation.md) covers the research question,
+methods, results, limitations and likely questions.
+
 ## Project layout
 
 ```
@@ -294,6 +299,8 @@ app/views/                         Overview, Classical, Quantum, Comparison, Lim
 app/components/                    sidebar, session state, cached runners
 .streamlit/config.toml             local Streamlit settings (no secrets)
 docs/qae_design.md                 QAE design, implementation decisions and results
+docs/presentation.md               research write-up: question, methods, results, limitations, Q&A
+docs/demo_guide.md                 5–7 minute live-demo script with expected numbers
 tests/                             pytest suite
 ```
 
