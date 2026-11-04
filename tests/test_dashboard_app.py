@@ -28,7 +28,6 @@ def _text(at: AppTest) -> str:
     parts = []
     for group in (at.markdown, at.caption, at.warning, at.info, at.error, at.success, at.title, at.subheader):
         parts.extend(str(el.value) for el in group)
-    parts.extend(f"{m.label}: {m.value}" for m in at.metric)
     return "\n".join(parts)
 
 
@@ -38,9 +37,25 @@ def _click(at: AppTest, label: str) -> None:
     assert not at.exception, [e.value for e in at.exception]
 
 
-def _metric(at: AppTest, label: str) -> str:
-    [m] = [m for m in at.metric if m.label == label]
-    return m.value
+def _row(at: AppTest, label: str) -> list[str]:
+    """Cells after the label cell of the one readout/facts table row whose label contains ``label``.
+
+    Bold markers are stripped and non-breaking spaces normalised, so values compare as plain text.
+    """
+    rows = []
+    for md in at.markdown:
+        for line in str(md.value).splitlines():
+            if not line.startswith("|"):
+                continue
+            cells = [c.strip().replace("**", "").replace("\u00a0", " ") for c in line.strip().strip("|").split("|")]
+            if label in cells[0]:
+                rows.append(cells[1:])
+    assert len(rows) == 1, (label, rows)
+    return rows[0]
+
+
+def _value(at: AppTest, label: str) -> str:
+    return _row(at, label)[0]
 
 
 @pytest.mark.parametrize("page", ["views/overview.py", "views/classical.py", "views/quantum.py",
@@ -55,7 +70,7 @@ def test_sidebar_shows_raw_and_normalized_weights_and_exact_value():
     at = _app()
     tables = [df.value for df in at.sidebar.dataframe]
     assert any({"Raw", "Normalised"} <= set(t.columns) for t in tables)
-    assert _metric(at, labels.EXACT) == "0.079184"
+    assert _value(at, "Failure probability p(t = 5,000 h)") == "0.079184"
 
 
 def test_sidebar_shows_raw_weights_beside_normalized_weights(monkeypatch):
@@ -75,7 +90,7 @@ def test_sidebar_shows_raw_weights_beside_normalized_weights(monkeypatch):
     assert list(weights["Raw"]) == ["2", "5", "3"]
     assert list(weights["Normalised"]) == ["0.2000", "0.5000", "0.3000"]
     assert any("sum to 10" in i.value for i in at.sidebar.info)
-    assert _metric(at, labels.EXACT) == "0.079184"  # same model as (0.2, 0.5, 0.3)
+    assert _value(at, "Failure probability p(t = 5,000 h)") == "0.079184"  # same model as (0.2, 0.5, 0.3)
 
 
 def test_editor_focus_hint_is_shown_under_the_table(monkeypatch):
@@ -92,8 +107,10 @@ def test_classical_run_matches_documented_numbers_and_goes_stale():
     at = _app()
     at.switch_page("views/classical.py").run()
     _click(at, "Run Monte Carlo")
-    assert _metric(at, labels.MC) == "0.080190"  # 100,000 samples, seed 2026 (README / milestone1 demo)
-    assert f"{labels.MC_CI}:** [0.078523, 0.081889]" in _text(at)  # full interval, never truncated
+    # 100,000 samples, seed 2026 (README / milestone1 demo); the full interval is shown, never truncated.
+    assert _row(at, labels.MC) == ["0.080190", "[0.078523, 0.081889]", "0.003367", "0.001006", "100,000 samples"]
+    assert _row(at, labels.EXACT)[0] == "0.079184"
+    assert "8,019 failures in 100,000 samples" in _text(at)
     assert not any("out of date" in w.value for w in at.warning)
     at.sidebar.number_input(key="sb_beta").set_value(2.5).run()
     stale = [w.value for w in at.warning if "out of date" in w.value]
@@ -126,9 +143,13 @@ def test_quantum_page_labels_costs_and_staleness():
     # 30 shots is outside the calibration study: unknown-coverage warning, no measured range quoted.
     assert any("outside the calibration study" in w.value and "30 shots" in w.value for w in at.warning)
     assert labels.QAE_CI_CAPTION not in text
-    assert _metric(at, labels.QUERY_COMPLEXITY) == f"{30 * (1 + 3 + 5):,}"
-    assert f"{labels.QAE_CI}:** [" in text  # interval shown in full on its own line
-    assert any("Circuit check" in s.value for s in at.success)
+    assert _value(at, labels.QUERY_COMPLEXITY) == f"{30 * (1 + 3 + 5):,}"
+    r = at.session_state["quantum_run"].result
+    q = _row(at, labels.QAE)  # estimate, full interval, width, error, budget in oracle queries
+    assert q[1] == f"[{services.format_probability(r.ci_low)}, {services.format_probability(r.ci_high)}]"
+    assert q[4] == f"{30 * (1 + 3 + 5):,} oracle queries"
+    assert f"Interval: {labels.QAE_CI}" in text
+    assert any("Circuit check" in c.value for c in at.caption)
     at.select_slider(key="q_shots").set_value(100).run()
     assert any("out of date" in w.value and "shots per circuit" in w.value for w in at.warning)
 
@@ -175,8 +196,8 @@ def test_quantum_timing_separates_compilation():
     at = _app()
     _quantum_text(at, 3, 100)
     r = at.session_state["quantum_run"].result
-    assert _metric(at, "Execution total") == f"{r.build_time_s + r.sampling_time_s + r.estimation_time_s:.3f} s"
-    assert _metric(at, "Compile (transpile)") == f"{r.transpile_time_s:.3f} s"
+    assert _value(at, "Execution total") == f"{r.build_time_s + r.sampling_time_s + r.estimation_time_s:.3f} s"
+    assert _value(at, "Compile (transpile)") == f"{r.transpile_time_s:.3f} s"
     assert labels.COMPILE_NOTE in _text(at)
 
 
@@ -196,9 +217,11 @@ def test_comparison_calibration_notice_and_timing_split(shots, calibrated):
         assert uncal and f"{shots} shots" in uncal[0] and labels.QAE_CI_CAPTION not in text
     comp = at.session_state["comparison_run"].comparison
     execution = comp.qae.build_time_s + comp.qae.sampling_time_s + comp.qae.estimation_time_s
-    assert _metric(at, labels.QAE_EXECUTION_TIME) == f"{execution:.4f} s"
-    assert _metric(at, labels.QAE_COMPILE_TIME) == f"{comp.qae.transpile_time_s:.4f} s"
-    assert _metric(at, "QAE execution ÷ MC time") == f"{execution / comp.mc_time_s:,.0f}×"
+    assert _value(at, labels.QAE_EXECUTION_TIME) == f"{execution:.4f} s"
+    assert _value(at, labels.QAE_COMPILE_TIME) == f"{comp.qae.transpile_time_s:.4f} s"
+    assert _value(at, "QAE execution ÷ MC time") == f"{execution / comp.mc_time_s:,.0f}×"
+    # Query budget is a separate table from runtime, with equal model evaluations for both methods.
+    assert _value(at, "Monte Carlo samples") == _value(at, "QAE oracle queries") == f"{shots * (1 + 3):,}"
     assert labels.COMPILE_NOTE in text
 
 
@@ -208,11 +231,11 @@ def test_default_settings_reproduce_the_documented_demo():
     at = _app()
     at.switch_page("views/classical.py").run()
     _click(at, "Run Monte Carlo")
-    assert _metric(at, labels.MC) == "0.080190"
+    assert _value(at, labels.MC) == "0.080190"
     at.switch_page("views/quantum.py").run()
     _click(at, "Run QAE on the simulator")
     r = at.session_state["quantum_run"].result
-    assert (_metric(at, labels.QAE), r.evaluation_schedule, r.shots, r.n_ci_regions) == (
+    assert (_value(at, labels.QAE), r.evaluation_schedule, r.shots, r.n_ci_regions) == (
         "0.078668", (0, 1, 2, 4, 8, 16), 100, 1)
     assert labels.QAE_CI_CAPTION in _text(at)  # calibrated settings, measured coverage quoted
     assert not any("outside the calibration study" in w.value for w in at.warning)
@@ -222,6 +245,9 @@ def test_default_settings_reproduce_the_documented_demo():
     df = at.dataframe[0].value
     assert [round(v, 6) for v in df["Value"]] == [0.079184, 0.077206, 0.078668]
     assert list(df["Model evaluations"].iloc[1:]) == [6800, 6800]
+    assert _row(at, labels.MC)[:2] == ["0.077206", "[0.071098, 0.083791]"]
+    assert _row(at, labels.QAE)[:2] == ["0.078668", "[0.076968, 0.080449]"]
+    assert len(at.get("plotly_chart")) == 1  # the estimates-and-intervals figure
 
 
 def test_comparison_page_matched_and_scaling():
@@ -241,7 +267,7 @@ def test_comparison_page_matched_and_scaling():
     at.select_slider(key="sc_shots").set_value(10).run()
     _click(at, "Run scaling study")
     assert labels.CRB_NOTE in _text(at)
-    assert len(at.get("plotly_chart")) == 1  # the error-vs-oracle-queries figure
+    assert len(at.get("plotly_chart")) == 2  # interval figure + the error-vs-oracle-queries figure
 
 
 @needs_qiskit
@@ -268,7 +294,17 @@ def test_quantum_pages_degrade_gracefully_without_qiskit(monkeypatch):
         assert not [b for b in at.button if b.label.startswith("Run")]
     at.switch_page("views/classical.py").run()
     _click(at, "Run Monte Carlo")
-    assert _metric(at, labels.MC) == "0.080190"
+    assert _value(at, labels.MC) == "0.080190"
+
+
+def test_no_decorative_emoji_icons_anywhere():
+    """The redesign uses text and colour semantics only; alerts carry no emoji icons."""
+    at = _app()
+    for page in ("views/overview.py", "views/classical.py", "views/quantum.py", "views/comparison.py",
+                 "views/limitations.py"):
+        at.switch_page(page).run()
+        for group in (at.warning, at.info, at.error, at.success):
+            assert all(not el.icon for el in group), page
 
 
 def test_limitations_page_states_key_caveats():

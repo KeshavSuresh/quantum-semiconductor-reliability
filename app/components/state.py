@@ -6,7 +6,7 @@ from typing import Any
 
 import streamlit as st
 
-from qsr.dashboard import labels, services
+from qsr.dashboard import labels, readout, services
 from qsr.dashboard.config import BuiltModel, ModelInputs
 from qsr.visualization import DARK, LIGHT, Theme
 
@@ -49,7 +49,7 @@ def stale_banner(run: Any, current: services.Fingerprint) -> bool:
     if run is None or run.fingerprint == current:
         return False
     changed = ", ".join(services.changed_fields(run.fingerprint, current)) or "settings"
-    st.warning(labels.STALE.format(changed=changed), icon="⚠️")
+    st.warning(labels.STALE.format(changed=changed))
     return True
 
 
@@ -63,7 +63,7 @@ def interval_scope_notice(result: Any) -> None:
     if status.covered:
         st.caption(labels.QAE_CI_CAPTION)
     else:
-        st.warning(labels.UNCALIBRATED_WARNING.format(reasons=status.reason_text), icon="⚠️")
+        st.warning(labels.UNCALIBRATED_WARNING.format(reasons=status.reason_text))
 
 
 def scope_preview(schedule: tuple[int, ...], shots: int) -> None:
@@ -79,14 +79,11 @@ def detail_line(*parts: str) -> None:
 
 
 def model_summary(inputs: ModelInputs, built: BuiltModel) -> None:
+    """One wrapping context line: the model in use and its exact reference values."""
     exact = services.exact_values(inputs)
-    unit = inputs.time_unit
-    with st.container(border=True):
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric(labels.EXACT, services.format_probability(exact.failure_probability), help=labels.EXACT_HELP)
-        c2.metric("Exact reliability R = 1 − p", services.format_probability(exact.reliability))
-        c3.metric("Mission time", f"{inputs.mission_time:g} {unit}")
-        c4.metric("Components K / shape β", f"{built.model.n_components} / {inputs.beta:g}")
+    st.caption(f"{readout.model_line(inputs, built)} · {labels.EXACT.lower()} "
+               f"**{services.format_probability(exact.failure_probability)}** · reliability "
+               f"**{services.format_probability(exact.reliability)}**")
 
 
 # --- cached runners: arguments are hashable; results are frozen dataclasses ---

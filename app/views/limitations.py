@@ -4,11 +4,23 @@ import streamlit as st
 
 from qsr.dashboard import labels
 
-st.title("Scientific limitations")
+st.title("Limitations")
 st.markdown("Read this before drawing conclusions from the other pages. Full details, with the evidence, are in "
             "`docs/qae_design.md` (sections 7 and 8) in the project repository.")
 
-st.error(f"**No quantum speed-up is shown.** {labels.NO_SPEEDUP}", icon="🚫")
+st.markdown(f"> **Scope of the results.** {labels.NO_SPEEDUP}")
+
+st.markdown(
+    "| What the results show | What they do not show |\n|:--|:--|\n"
+    "| In the scaling study on this model, QAE's RMSE falls faster with oracle queries than Monte Carlo's falls "
+    "with samples (query complexity, idealised simulator, fixed seeds) | Any speed-up in time, on a simulator or "
+    "on hardware |\n"
+    "| The circuit encodes the exact model probability (statevector check) | Performance with noise, gate errors "
+    "or hardware connectivity |\n"
+    f"| The QAE interval's measured coverage at the tested settings (approximate, {labels.COVERAGE_RANGE[0]} to "
+    f"{labels.COVERAGE_RANGE[1]}) | Guaranteed "
+    "95 % coverage, or any coverage at untested settings |"
+)
 
 st.subheader("1. Everything quantum here is a classical simulation")
 st.markdown(
