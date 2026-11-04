@@ -17,9 +17,11 @@ from qsr.visualization.plots import (
     plot_mc_vs_exact,
     run_mc_convergence,
 )
+from qsr.visualization.scaling import plot_error_vs_queries
 from qsr.visualization.theme import DARK, LIGHT, Theme
 
 __all__ = [
+    "plot_error_vs_queries",
     "DARK",
     "LIGHT",
     "Theme",
