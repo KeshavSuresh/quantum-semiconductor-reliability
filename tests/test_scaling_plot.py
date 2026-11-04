@@ -8,7 +8,7 @@ def _rows():
     calls = [100, 400, 900, 1800]
     return [
         {"oracle_calls": n, "qae_rmse": 3.0 / n, "mc_rmse": 0.3 / np.sqrt(n),
-         "qae_theory_se": 2.7 / n, "mc_theory_se": 0.27 / np.sqrt(n)}
+         "qae_crb_se": 2.7 / n, "mc_binomial_se": 0.27 / np.sqrt(n)}
         for n in calls
     ]
 
@@ -18,12 +18,12 @@ def test_figure_structure_and_data():
     fig = plot_error_vs_queries(rows)
     names = [tr.name for tr in fig.data]
     assert names == [
-        "QAE (MLAE): measured RMSE", "QAE (MLAE): theory",
-        "Classical Monte Carlo: measured RMSE", "Classical Monte Carlo: theory",
+        "QAE (MLAE): measured RMSE", "QAE (MLAE): theory: Cramér–Rao bound",
+        "Classical Monte Carlo: measured RMSE", "Classical Monte Carlo: theory: binomial SE",
     ]
     np.testing.assert_array_equal(fig.data[0].x, [r["oracle_calls"] for r in rows])
     np.testing.assert_allclose(fig.data[0].y, [r["qae_rmse"] for r in rows])
-    np.testing.assert_allclose(fig.data[3].y, [r["mc_theory_se"] for r in rows])
+    np.testing.assert_allclose(fig.data[3].y, [r["mc_binomial_se"] for r in rows])
     assert fig.layout.xaxis.type == "log" and fig.layout.yaxis.type == "log"
     assert "not runtime" in fig.layout.title.text
     assert {a.text for a in fig.layout.annotations} == {"QAE", "MC"}
@@ -48,7 +48,7 @@ def test_dark_theme():
         lambda rs: rs.reverse(),
         lambda rs: rs[0].update(oracle_calls=0),
         lambda rs: rs[0].update(mc_rmse=-1.0),
-        lambda rs: rs[0].update(qae_theory_se=float("nan")),
+        lambda rs: rs[0].update(qae_crb_se=float("nan")),
     ],
 )
 def test_invalid_rows_rejected(mutate):

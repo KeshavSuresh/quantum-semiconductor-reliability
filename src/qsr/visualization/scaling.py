@@ -13,7 +13,7 @@ import plotly.graph_objects as go
 
 from qsr.visualization.theme import LIGHT, LINE_WIDTH, MARKER_SIZE, Theme, apply_layout
 
-REQUIRED_KEYS = ("oracle_calls", "qae_rmse", "mc_rmse", "qae_theory_se", "mc_theory_se")
+REQUIRED_KEYS = ("oracle_calls", "qae_rmse", "mc_rmse", "qae_crb_se", "mc_binomial_se")
 
 
 def _check_rows(rows: Sequence[Mapping[str, float]]) -> list[Mapping[str, float]]:
@@ -36,8 +36,10 @@ def _check_rows(rows: Sequence[Mapping[str, float]]) -> list[Mapping[str, float]
 def plot_error_vs_queries(rows: Sequence[Mapping[str, float]], *, theme: Theme = LIGHT) -> go.Figure:
     """Log-log plot of RMSE vs oracle calls: measured points plus theoretical scaling lines.
 
-    The x axis counts model evaluations (QAE: applications of A or A^dagger;
-    MC: samples). It says nothing about wall-clock time.
+    The x axis counts oracle queries: applications of A or A^dagger summed over
+    all shots (QAE), or samples (MC). It says nothing about wall-clock time.
+    Dashed lines are theoretical predictions (QAE: asymptotic Cramer-Rao bound;
+    MC: binomial standard error), not measurements.
     """
     if not isinstance(theme, Theme):
         raise TypeError("theme must be a qsr.visualization.Theme (use LIGHT or DARK)")
@@ -46,10 +48,10 @@ def plot_error_vs_queries(rows: Sequence[Mapping[str, float]], *, theme: Theme =
 
     fig = go.Figure()
     series = [
-        ("QAE (MLAE)", "qae", theme.series[0]),
-        ("Classical Monte Carlo", "mc", theme.series[1]),
+        ("QAE (MLAE)", "qae", "qae_crb_se", "theory: Cramér–Rao bound", theme.series[0]),
+        ("Classical Monte Carlo", "mc", "mc_binomial_se", "theory: binomial SE", theme.series[1]),
     ]
-    for name, key, color in series:
+    for name, key, theory_key, theory_label, color in series:
         y = np.array([r[f"{key}_rmse"] for r in rs], dtype=float)
         y_plot = np.where(y > 0, y, np.nan)  # log axis cannot show exact zeros
         fig.add_trace(go.Scatter(
@@ -59,12 +61,12 @@ def plot_error_vs_queries(rows: Sequence[Mapping[str, float]], *, theme: Theme =
             hovertemplate=f"{name}<br>oracle calls = %{{x:,}}<br>RMSE = %{{y:.3g}}<extra></extra>",
         ))
         fig.add_trace(go.Scatter(
-            x=x, y=[r[f"{key}_theory_se"] for r in rs], mode="lines", name=f"{name}: theory",
+            x=x, y=[r[theory_key] for r in rs], mode="lines", name=f"{name}: {theory_label}",
             line=dict(color=color, width=LINE_WIDTH, dash="dash"),
-            hovertemplate=f"{name} theory<br>oracle calls = %{{x:,}}<br>SE = %{{y:.3g}}<extra></extra>",
+            hovertemplate=f"{name} {theory_label}<br>oracle calls = %{{x:,}}<br>SE = %{{y:.3g}}<extra></extra>",
         ))
         fig.add_annotation(
-            x=float(np.log10(x[-1])), y=float(np.log10(rs[-1][f"{key}_theory_se"])), xref="x", yref="y",
+            x=float(np.log10(x[-1])), y=float(np.log10(rs[-1][theory_key])), xref="x", yref="y",
             text="QAE" if key == "qae" else "MC", showarrow=False, xanchor="left", xshift=8,
             font=dict(color=theme.ink_secondary, size=12),
         )
@@ -72,7 +74,8 @@ def plot_error_vs_queries(rows: Sequence[Mapping[str, float]], *, theme: Theme =
     apply_layout(
         fig, theme,
         title="Estimation error vs oracle calls (query complexity, not runtime)",
-        x_title="Oracle calls / Monte Carlo samples (log scale)", y_title="RMSE over fixed seeds (log scale)",
+        x_title="Oracle queries: A or A† applications (QAE) / samples (MC), log scale",
+        y_title="RMSE over fixed seeds (log scale)",
     )
     # Decade ticks only; four legend entries go below the plot so they never collide with the title.
     fig.update_xaxes(type="log", dtick=1)

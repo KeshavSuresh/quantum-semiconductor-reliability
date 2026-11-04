@@ -1,10 +1,16 @@
 """Compare QAE with the exact probability and with classical Monte Carlo.
 
-Fairness rules:
+Fairness rules (query convention: see ``amplitude_estimation`` module docstring):
 
-* Both methods use the same ``DiscreteEtaModel``, mission time and seed.
+* Both methods use the same ``DiscreteEtaModel`` and mission time, and the same
+  integer seed. The seed only makes each method reproducible; the two random
+  streams are unrelated, so the runs are not paired or correlated.
 * Classical MC gets ``n_samples = qae.state_preparation_calls``: one classical
-  sample for every application of ``A`` or ``A^dagger`` in the quantum circuits.
+  sample (one evaluation of the full mixture model) for every application of
+  ``A`` or ``A^dagger`` in the executed circuits, summed over all shots. This
+  matches the standard QAE query-complexity convention. It deliberately
+  ignores that one ``A`` on hardware costs many gates while one MC sample costs
+  a few floating-point operations, so it compares sample efficiency, not cost.
 
 Two kinds of cost are reported separately and must not be confused:
 
@@ -87,12 +93,17 @@ def error_scaling_study(
 ) -> list[dict[str, float | int]]:
     """RMSE over fixed seeds versus query budget, for QAE (exponential schedules) and budget-matched MC.
 
-    Each row also gives the theoretical standard errors at the true probability:
+    Each row also gives THEORETICAL reference errors at the true probability
+    (predictions, not measurements):
 
-    * QAE: ``sin(2 theta) / sqrt(4 N sum_k (2 m_k + 1)^2)`` (Fisher bound)
-    * MC:  ``sqrt(p (1 - p) / N_samples)``
+    * ``qae_crb_se``: asymptotic Cramer-Rao bound ``sin(2 theta) / sqrt(4 N sum_k (2 m_k + 1)^2)``.
+      A finite-sample MLE can fall above or below it.
+    * ``mc_binomial_se``: exact MC standard error ``sqrt(p (1 - p) / N_samples)``.
 
-    and the measured mean wall-clock time per run for each method.
+    RMSE is ``sqrt(mean((estimate - exact)^2))`` over the given seeds. Coverage is
+    reported both as counts (``*_ci_covered`` out of ``n_seeds``) and as a fraction;
+    with few seeds it is illustrative only (see examples/milestone3_ci_calibration.py).
+    Measured mean wall-clock seconds per run are reported separately for each method.
     """
     model = _check_model(model)
     t = _check_mission_time(mission_time)
@@ -109,7 +120,7 @@ def error_scaling_study(
     rows: list[dict[str, float | int]] = []
     for length in lengths:
         powers = _check_schedule(exponential_schedule(length))
-        q_err, m_err, q_cov, m_cov, q_time, m_time = [], [], 0, 0, 0.0, 0.0
+        q_err, m_err, q_cov, m_cov, q_multi, q_time, m_time = [], [], 0, 0, 0, 0.0, 0.0
         budget = n_shots * sum(2 * m + 1 for m in powers)
         for s in seed_list:
             q = estimate_failure_probability_qae(
@@ -123,6 +134,7 @@ def error_scaling_study(
             q_err.append(q.estimate - exact)
             m_err.append(m.estimate - exact)
             q_cov += q.ci_low <= exact <= q.ci_high
+            q_multi += q.n_ci_regions > 1
             m_cov += m.ci_low <= exact <= m.ci_high
         factors = 2.0 * np.array(powers, dtype=float) + 1.0
         n_runs = len(seed_list)
@@ -132,8 +144,11 @@ def error_scaling_study(
             "oracle_calls": budget,
             "qae_rmse": float(np.sqrt(np.mean(np.square(q_err)))),
             "mc_rmse": float(np.sqrt(np.mean(np.square(m_err)))),
-            "qae_theory_se": abs(math.sin(2 * theta)) / math.sqrt(4.0 * n_shots * float(np.sum(factors**2))),
-            "mc_theory_se": math.sqrt(exact * (1.0 - exact) / budget),
+            "qae_crb_se": abs(math.sin(2 * theta)) / math.sqrt(4.0 * n_shots * float(np.sum(factors**2))),
+            "mc_binomial_se": math.sqrt(exact * (1.0 - exact) / budget),
+            "qae_ci_covered": q_cov,
+            "mc_ci_covered": m_cov,
+            "qae_multi_region_cis": q_multi,
             "qae_ci_coverage": q_cov / n_runs,
             "mc_ci_coverage": m_cov / n_runs,
             "qae_mean_time_s": q_time / n_runs,

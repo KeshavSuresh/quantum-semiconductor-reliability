@@ -19,8 +19,10 @@ except ImportError as exc:  # pragma: no cover - exercised in a subprocess test
     ) from exc
 
 from qsr.quantum.amplitude_estimation import (
+    MLAEFit,
     QAEResult,
     build_amplification_circuits,
+    circuit_seeds,
     estimate_failure_probability_qae,
     exponential_schedule,
     mlae_estimate,
@@ -35,10 +37,12 @@ from qsr.quantum.state_preparation import (
 )
 
 __all__ = [
+    "MLAEFit",
     "QAEComparison",
     "QAEResult",
     "build_amplification_circuits",
     "build_state_preparation",
+    "circuit_seeds",
     "compare_with_monte_carlo",
     "error_scaling_study",
     "estimate_failure_probability_qae",

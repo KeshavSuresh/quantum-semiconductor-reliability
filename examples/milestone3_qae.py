@@ -70,14 +70,16 @@ def main() -> None:
     schedule = exponential_schedule(6)
     c = compare_with_monte_carlo(model, MISSION_TIME_HOURS, seed=SEED, evaluation_schedule=schedule, shots=SHOTS)
     q = c.qae
-    print(f"\n2. Single run, seed = {SEED}, schedule m = {list(q.evaluation_schedule)}, shots/circuit = {q.shots}")
+    print(f"\n2. Single run, seed = {SEED} (per-circuit seeds spawned from it), schedule m = {list(q.evaluation_schedule)}, shots/circuit = {q.shots}")
     print(f"   {'method':<22} {'estimate':>10} {'95% CI':>23} {'|error|':>10} {'oracle calls':>13} {'time [s]':>10}")
     print(f"   {'exact':<22} {exact:>10.6f}")
     print(f"   {'QAE (MLAE, simulated)':<22} {q.estimate:>10.6f} [{q.ci_low:.6f}, {q.ci_high:.6f}] "
           f"{c.qae_abs_error:>10.6f} {q.state_preparation_calls:>13,} {q.total_time_s:>10.4f}")
     print(f"   {'classical MC':<22} {c.mc.estimate:>10.6f} [{c.mc.ci_low:.6f}, {c.mc.ci_high:.6f}] "
           f"{c.mc_abs_error:>10.6f} {c.mc.n_samples:>13,} {c.mc_time_s:>10.4f}")
-    print(f"   QAE Grover applications = {q.grover_applications:,}; "
+    print(f"   oracle calls = shots x sum(2m+1) = {q.shots} x {sum(2 * m + 1 for m in q.evaluation_schedule)}"
+          f" = {q.state_preparation_calls:,} applications of A or A-dagger")
+    print(f"   CI regions = {q.n_ci_regions}; QAE Grover applications (= phase-oracle calls) = {q.grover_applications:,}; "
           f"circuit depth per power (basis rz,sx,x,cx, opt level 1) = {list(q.circuit_depths)}")
     print(f"   CX count per power = {list(q.two_qubit_gate_counts)}")
     print(f"   QAE time split [s]: build {q.build_time_s:.4f}, transpile {q.transpile_time_s:.4f}, "
@@ -90,13 +92,16 @@ def main() -> None:
         model, MISSION_TIME_HOURS, schedule_lengths=lengths, shots=SHOTS, seeds=seeds
     )
     print(f"\n3. Error vs oracle calls, RMSE over {len(seeds)} fixed seeds, {SHOTS} shots per circuit")
-    print(f"   {'m_max':>5} {'calls':>7} {'QAE RMSE':>10} {'QAE theory':>11} {'MC RMSE':>10} {'MC theory':>10} "
+    print(f"   {'m_max':>5} {'calls':>7} {'QAE RMSE':>10} {'QAE CRB':>11} {'MC RMSE':>10} {'MC bin.SE':>10} "
           f"{'QAE cov':>8} {'MC cov':>7} {'QAE s/run':>10} {'MC s/run':>9}")
+    print("   (coverage counts over these few seeds are illustrative; see milestone3_ci_calibration.py)")
     for r in rows:
-        print(f"   {r['max_grover_power']:>5} {r['oracle_calls']:>7,} {r['qae_rmse']:>10.6f} {r['qae_theory_se']:>11.6f} "
-              f"{r['mc_rmse']:>10.6f} {r['mc_theory_se']:>10.6f} {r['qae_ci_coverage']:>8.2f} {r['mc_ci_coverage']:>7.2f} "
+        print(f"   {r['max_grover_power']:>5} {r['oracle_calls']:>7,} {r['qae_rmse']:>10.6f} {r['qae_crb_se']:>11.6f} "
+              f"{r['mc_rmse']:>10.6f} {r['mc_binomial_se']:>10.6f} {r['qae_ci_covered']:>5}/{r['n_seeds']:<2} {r['mc_ci_covered']:>4}/{r['n_seeds']:<2} "
               f"{r['qae_mean_time_s']:>10.4f} {r['mc_mean_time_s']:>9.5f}")
-    print("   theory: QAE ~ 1/calls (Fisher bound), MC ~ 1/sqrt(calls). Times are simulator wall-clock, not hardware.")
+    print("   CRB = asymptotic Cramer-Rao bound (~1/calls); bin.SE = binomial SE (~1/sqrt(calls)); both are theory.")
+    print("   'calls' = applications of A or A-dagger summed over all shots (QAE) / samples (MC).")
+    print("   Times are simulator wall-clock seconds on this machine, not quantum-hardware estimates.")
 
     theme = DARK if args.dark else LIGHT
     args.out_dir.mkdir(parents=True, exist_ok=True)
