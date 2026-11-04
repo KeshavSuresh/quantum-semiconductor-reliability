@@ -19,6 +19,9 @@ dependencies = [
 dev = [
     "pytest>=8.0",
 ]
+viz = [
+    "plotly>=5.20",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
