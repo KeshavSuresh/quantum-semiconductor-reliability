@@ -1,3 +1,4 @@
-# Development install: the qsr package in editable mode plus test, plotting and quantum tools.
+# Development install: the qsr package in editable mode plus test, plotting,
+# quantum and dashboard tools. The dashboard extra needs Python >= 3.11.
 # Usage: pip install -r requirements-dev.txt
--e .[dev,viz,quantum]
+-e .[dev,viz,quantum,app]

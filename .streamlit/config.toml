@@ -1,0 +1,12 @@
+# Streamlit settings for the local dashboard. No secrets belong in this file
+# (.streamlit/secrets.toml is git-ignored).
+
+[browser]
+gatherUsageStats = false
+
+[server]
+runOnSave = false
+
+[client]
+# Hide developer/deploy toolbar options; this dashboard is for local use only.
+toolbarMode = "minimal"

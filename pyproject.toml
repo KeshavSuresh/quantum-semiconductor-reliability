@@ -25,6 +25,12 @@ viz = [
 quantum = [
     "qiskit>=2.1,<3",
 ]
+# Streamlit dashboard (Milestone 4). Streamlit requires Python >= 3.11; the
+# scientific core above stays installable on Python 3.10.
+app = [
+    "streamlit>=1.49,<2; python_version >= '3.11'",
+    "plotly>=5.20",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
