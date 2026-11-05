@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qsr"
+version = "0.1.0"
+description = "Quantum Semiconductor Reliability Explorer: TDDB Weibull reliability with exact, classical Monte Carlo and simulated Quantum Amplitude Estimation (MLAE) estimates, plus an optional Streamlit dashboard."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+authors = [{ name = "KeshavSuresh" }]
+dependencies = [
+    "numpy>=2.0",
+    "scipy>=1.13",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+viz = [
+    "plotly>=5.20",
+]
+quantum = [
+    "qiskit>=2.1,<3",
+]
+# Streamlit dashboard (Milestone 4). Streamlit requires Python >= 3.11; the
+# scientific core above stays installable on Python 3.10.
+app = [
+    "streamlit>=1.49,<2; python_version >= '3.11'",
+    "plotly>=5.20",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
